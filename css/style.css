@@ -1,0 +1,56 @@
+body {
+    font-family: sans-serif;
+    background-color: #f4f4f4;
+    padding: 1rem;
+}
+
+.container {
+    max-width: 500px;
+    margin: auto;
+    background: #fff;
+    padding: 2rem;
+    border-radius: 5px;
+}
+
+.section {
+    margin-bottom: 1rem;
+}
+
+hr {
+    border: none;
+    border-top: 1px solid #eee;
+    margin: 2rem 0;
+}
+
+input, input[type="file"] {
+    display: block;
+    width: 95%;
+    padding: 8px;
+    margin-bottom: 10px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+}
+
+button {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    background: #333;
+    color: #fff;
+    cursor: pointer;
+    border-radius: 3px;
+    margin-top: 5px;
+}
+
+button:hover {
+    background: #555;
+}
+
+pre {
+    background: #eee;
+    padding: 1rem;
+    border: 1px solid #ddd;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    min-height: 100px;
+}
