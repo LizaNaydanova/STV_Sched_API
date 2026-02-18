@@ -47,9 +47,9 @@ const clinicConfigs = {
             { name: "Ophtho Volunteer", start: "16:15", end: "18:15", seats: 2 },
             { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 4 },
             { name: "Family Planning Lead", start: "16:15", end: "18:15", seats: 2 },
-            { name: "Family Planning", start: "16:15", end: "18:15", seats: 2 },
-            { name: "Family Planning", start: "17:15", end: "19:15", seats: 2 },
-            { name: "Family Planning", start: "18:15", end: "20:15", seats: 2 }
+            { name: "Family Planning Volunteer", start: "16:15", end: "18:15", seats: 2 },
+            { name: "Family Planning Volunteer", start: "17:15", end: "19:15", seats: 2 },
+            { name: "Family Planning Volunteer", start: "18:15", end: "20:15", seats: 2 }
         ],
         shifts: {
             Experienced: [{ s: "16:15", e: "18:15", c: 3 }, { s: "17:30", e: "19:30", c: 3 }],
@@ -371,7 +371,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const dayTypeMap = {
                 2: { 3: "Ob_Gyn" },           // Tuesday
                 4: { 1: "Derm", 2: "Psych_Rheum", 3: "Surgery_ENT", 4: "Psych" }, // Thursday
-                6: { 1: "Medicine_Nephro", 2: "Neuro", 4: "Neuro" }   // Saturday
+                6: { 2: "Neuro", 4: "Neuro" }   // Saturday
             };
             let counters = { 2: 0, 4: 0, 6: 0 };
 
