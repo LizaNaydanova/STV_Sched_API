@@ -17,24 +17,6 @@ const leadershipRoles = [
 
 // Clinic configurations
 const clinicConfigs = {
-    "Medicine_Podiatry": {
-        venue: "Medicine/Podiatry",
-        leadership_times: { start: "16:15", end: "20:15" },
-        leadership_volunteer_slots: [
-            { name: "Leadership Volunteer", start: "16:15", end: "18:15", seats: 3 },
-            { name: "Leadership Volunteer", start: "17:30", end: "19:30", seats: 2 }
-        ],
-        general: [
-            { name: "Ophtho Lead", start: "16:15", end: "18:15", seats: 1 },
-            { name: "Ophtho Volunteer", start: "16:15", end: "18:15", seats: 2 },
-            { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 4 },
-            { name: "Podiatry", start: "16:15", end: "18:15", seats: 2 }
-        ],
-        shifts: {
-            Experienced: [{ s: "16:15", e: "18:15", c: 4 }, { s: "17:30", e: "19:30", c: 4 }],
-            New: [{ s: "16:15", e: "18:30", c: 4 }, { s: "17:30", e: "19:30", c: 4 }]
-        }
-    },
     "Ob_Gyn": {
         venue: "Ob/Gyn",
         leadership_times: { start: "16:15", end: "20:15" },
@@ -43,18 +25,16 @@ const clinicConfigs = {
             { name: "Leadership Volunteer", start: "17:30", end: "19:30", seats: 2 }
         ],
         general: [
-            { name: "Ophtho Lead", start: "16:15", end: "18:15", seats: 1 },
-            { name: "Ophtho Volunteer", start: "16:15", end: "18:15", seats: 2 },
             { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 4 },
             { name: "Family Planning Lead", start: "16:15", end: "18:15", seats: 2 },
             { name: "Family Planning Volunteer", start: "16:15", end: "18:15", seats: 2 },
             { name: "Family Planning Volunteer", start: "17:15", end: "19:15", seats: 2 },
-            { name: "Family Planning Volunteer", start: "18:15", end: "20:15", seats: 2 }
-        ],
-        shifts: {
-            Experienced: [{ s: "16:15", e: "18:15", c: 3 }, { s: "17:30", e: "19:30", c: 3 }],
-            New: [{ s: "16:15", e: "18:15", c: 3 }, { s: "17:30", e: "19:30", c: 3 }]
-        }
+            { name: "Family Planning Volunteer", start: "18:15", end: "20:15", seats: 2 },
+            { name: "Ob/Gyn Experienced", start: "16:15", end: "18:15", seats: 3 },
+            { name: "Ob/Gyn Experienced", start: "17:30", end: "19:30", seats: 3 },
+            { name: "Ob/Gyn New", start: "16:15", end: "18:15", seats: 3 },
+            { name: "Ob/Gyn New", start: "17:30", end: "19:30", seats: 3 }
+        ]
     },
     "Medicine": {
         venue: "Medicine",
@@ -66,6 +46,21 @@ const clinicConfigs = {
         general: [
             { name: "Ophtho Lead", start: "16:15", end: "18:15", seats: 1 },
             { name: "Ophtho Volunteer", start: "16:15", end: "18:15", seats: 2 },
+            { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 4 }
+        ],
+        shifts: {
+            Experienced: [{ s: "16:15", e: "18:15", c: 4 }, { s: "17:30", e: "19:30", c: 4 }],
+            New: [{ s: "16:15", e: "18:30", c: 4 }, { s: "17:30", e: "19:30", c: 4 }]
+        }
+    },
+    "Medicine_NoOphtho": {
+        venue: "Medicine",
+        leadership_times: { start: "16:15", end: "20:15" },
+        leadership_volunteer_slots: [
+            { name: "Leadership Volunteer", start: "16:15", end: "18:15", seats: 3 },
+            { name: "Leadership Volunteer", start: "17:30", end: "19:30", seats: 2 }
+        ],
+        general: [
             { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 4 }
         ],
         shifts: {
@@ -196,7 +191,7 @@ function formatTo12Hour(timeString) {
 
 async function addSlot(apiKey, day, type, subtype, descriptiveVenue, startTime, endTime, seats, frozen = true) {
     const dateString = day.toISOString().substring(0, 10);
-    const session_key = `${dateString.replace(/-/g, '')}_${descriptiveVenue.replace('/', '')}_${subtype.substring(0, 4)}_${startTime.replace(':', '')}`.slice(0, 32);
+    const session_key = `${dateString.replace(/-/g, '')}_${descriptiveVenue.replace('/', '')}_${subtype.replace(/\s+/g, '')}_${startTime.replace(':', '')}`.slice(0, 64);
 
     const month = (day.getMonth() + 1).toString().padStart(2, '0');
     const date = day.getDate().toString().padStart(2, '0');
@@ -369,7 +364,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Day type mapping: which clinic type occurs on which week of the month
             const dayTypeMap = {
-                2: { 3: "Ob_Gyn" },           // Tuesday
+                2: { 1: "Medicine_NoOphtho", 3: "Ob_Gyn" },           // Tuesday
                 4: { 1: "Derm", 2: "Psych_Rheum", 3: "Surgery_ENT", 4: "Psych" }, // Thursday
                 6: { 2: "Neuro", 4: "Neuro" }   // Saturday
             };
@@ -445,9 +440,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Day type mapping: which clinic type occurs on which week of the month
             const dayTypeMap = {
-                2: { 3: "Ob_Gyn" },           // Tuesday
+                2: { 1: "Medicine_NoOphtho", 3: "Ob_Gyn" },           // Tuesday
                 4: { 1: "Derm", 2: "Psych_Rheum", 3: "Surgery_ENT", 4: "Psych" }, // Thursday
-                6: { 1: "Medicine_Nephro", 2: "Neuro", 4: "Neuro" }   // Saturday
+                6: { 2: "Neuro", 4: "Neuro" }   // Saturday
             };
             let counters = { 2: 0, 4: 0, 6: 0 };
 
