@@ -1,39 +1,27 @@
 // =================================================================
-// ======================== API CONFIGURATION ======================
-// =================================================================
-
-const SUBDOMAIN = "stvincentsclinic2025";
-
-// =================================================================
 // ====================== API HELPER FUNCTIONS =====================
 // =================================================================
 
 /**
- * A generic function to make API calls to the Sched.com API.
+ * A generic function to make API calls via the local proxy server.
  * @param {string} path - The API endpoint path.
- * @param {object} params - An object of parameters for the query string.
+ * @param {object} params - An object of parameters for the request.
  * @param {string} apiKey - Your Sched.com API key.
  * @returns {Promise<any>}
  */
 async function schedApiCall(path, params, apiKey) {
     params.api_key = apiKey;
 
-    const url = `https://${SUBDOMAIN}.sched.com/api/${path}`;
-
-    // Create form data for POST request
-    const formData = new URLSearchParams();
-    for (const key in params) {
-        formData.append(key, params[key]);
-    }
+    // Use local proxy server to avoid CORS issues
+    const url = `/api/${path}`;
 
     try {
         const response = await fetch(url, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'User-Agent': 'STV-Sched-API/1.0'
+                'Content-Type': 'application/json'
             },
-            body: formData.toString()
+            body: JSON.stringify(params)
         });
 
         if (!response.ok) {
@@ -41,11 +29,11 @@ async function schedApiCall(path, params, apiKey) {
             throw new Error(`API Error for ${path}: ${errorText} (Status: ${response.status})`);
         }
 
-        const responseText = await response.text();
-        try {
-            return JSON.parse(responseText);
-        } catch (e) {
-            return responseText;
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            return await response.json();
+        } else {
+            return await response.text();
         }
     } catch (error) {
         console.error(`API call to ${path} failed:`, error);

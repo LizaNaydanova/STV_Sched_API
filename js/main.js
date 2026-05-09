@@ -17,6 +17,24 @@ const leadershipRoles = [
 
 // Clinic configurations
 const clinicConfigs = {
+    "Medicine_Podiatry": {
+        venue: "Medicine/Podiatry",
+        leadership_times: { start: "16:15", end: "20:15" },
+        leadership_volunteer_slots: [
+            { name: "Leadership Volunteer", start: "16:15", end: "18:15", seats: 3 },
+            { name: "Leadership Volunteer", start: "17:30", end: "19:30", seats: 2 }
+        ],
+        general: [
+            { name: "Ophtho Lead", start: "16:15", end: "18:15", seats: 1 },
+            { name: "Ophtho Volunteer", start: "16:15", end: "18:15", seats: 2 },
+            { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 4 },
+            { name: "Podiatry", start: "16:15", end: "18:15", seats: 2 }
+        ],
+        shifts: {
+            Experienced: [{ s: "16:15", e: "18:15", c: 4 }, { s: "17:30", e: "19:30", c: 4 }],
+            New: [{ s: "16:15", e: "18:30", c: 4 }, { s: "17:30", e: "19:30", c: 4 }]
+        }
+    },
     "Ob_Gyn": {
         venue: "Ob/Gyn",
         leadership_times: { start: "16:15", end: "20:15" },
@@ -25,16 +43,18 @@ const clinicConfigs = {
             { name: "Leadership Volunteer", start: "17:30", end: "19:30", seats: 2 }
         ],
         general: [
+            { name: "Ophtho Lead", start: "16:15", end: "18:15", seats: 1 },
+            { name: "Ophtho Volunteer", start: "16:15", end: "18:15", seats: 2 },
             { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 4 },
             { name: "Family Planning Lead", start: "16:15", end: "18:15", seats: 2 },
             { name: "Family Planning Volunteer", start: "16:15", end: "18:15", seats: 2 },
             { name: "Family Planning Volunteer", start: "17:15", end: "19:15", seats: 2 },
-            { name: "Family Planning Volunteer", start: "18:15", end: "20:15", seats: 2 },
-            { name: "Ob/Gyn Experienced", start: "16:15", end: "18:15", seats: 3 },
-            { name: "Ob/Gyn Experienced", start: "17:30", end: "19:30", seats: 3 },
-            { name: "Ob/Gyn New", start: "16:15", end: "18:15", seats: 3 },
-            { name: "Ob/Gyn New", start: "17:30", end: "19:30", seats: 3 }
-        ]
+            { name: "Family Planning Volunteer", start: "18:15", end: "20:15", seats: 2 }
+        ],
+        shifts: {
+            Experienced: [{ s: "16:15", e: "18:15", c: 3 }, { s: "17:30", e: "19:30", c: 3 }],
+            New: [{ s: "16:15", e: "18:15", c: 3 }, { s: "17:30", e: "19:30", c: 3 }]
+        }
     },
     "Medicine": {
         venue: "Medicine",
@@ -46,21 +66,6 @@ const clinicConfigs = {
         general: [
             { name: "Ophtho Lead", start: "16:15", end: "18:15", seats: 1 },
             { name: "Ophtho Volunteer", start: "16:15", end: "18:15", seats: 2 },
-            { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 4 }
-        ],
-        shifts: {
-            Experienced: [{ s: "16:15", e: "18:15", c: 4 }, { s: "17:30", e: "19:30", c: 4 }],
-            New: [{ s: "16:15", e: "18:30", c: 4 }, { s: "17:30", e: "19:30", c: 4 }]
-        }
-    },
-    "Medicine_NoOphtho": {
-        venue: "Medicine",
-        leadership_times: { start: "16:15", end: "20:15" },
-        leadership_volunteer_slots: [
-            { name: "Leadership Volunteer", start: "16:15", end: "18:15", seats: 3 },
-            { name: "Leadership Volunteer", start: "17:30", end: "19:30", seats: 2 }
-        ],
-        general: [
             { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 4 }
         ],
         shifts: {
@@ -143,21 +148,6 @@ const clinicConfigs = {
             New: [{ s: "16:15", e: "18:15", c: 5 }, { s: "17:30", e: "19:30", c: 5 }]
         }
     },
-    "Medicine_Nephro": {
-        venue: "Medicine/Nephro",
-        leadership_times: { start: "08:30", end: "12:15" },
-        leadership_volunteer_slots: [
-            { name: "Leadership Volunteer", start: "09:00", end: "11:00", seats: 3 },
-            { name: "Leadership Volunteer", start: "10:30", end: "12:30", seats: 3 }
-        ],
-        general: [
-            { name: "MS3/MS4/AI", start: "09:15", end: "11:15", seats: 4 }
-        ],
-        shifts: {
-            Experienced: [{ s: "09:00", e: "11:00", c: 4 }, { s: "10:30", e: "12:30", c: 4 }],
-            New: [{ s: "09:00", e: "10:30", c: 4 }, { s: "10:30", e: "12:30", c: 4 }]
-        }
-    },
     "Neuro": {
         venue: "Neuro",
         leadership_times: { start: "08:30", end: "12:15" },
@@ -189,76 +179,68 @@ function formatTo12Hour(timeString) {
     return `${hour12}:${minute} ${suffix}`;
 }
 
-async function addSlot(apiKey, day, type, subtype, descriptiveVenue, startTime, endTime, seats, frozen = true) {
-    const dateString = day.toISOString().substring(0, 10);
-    const session_key = `${dateString.replace(/-/g, '')}_${descriptiveVenue.replace('/', '')}_${subtype.replace(/\s+/g, '')}_${startTime.replace(':', '')}`.slice(0, 64);
+async function addSlot(apiKey, day, type, subtype, venue, startTime, endTime, seats, frozen = true) {
+    const dateStr = day.toISOString().substring(0, 10);
+    const month = String(day.getMonth() + 1).padStart(2, '0');
+    const date = String(day.getDate()).padStart(2, '0');
 
-    const month = (day.getMonth() + 1).toString().padStart(2, '0');
-    const date = day.getDate().toString().padStart(2, '0');
-    const formattedDate = `${month}/${date}`;
-    const formattedTime = formatTo12Hour(startTime);
-    const name = `${formattedDate}_${descriptiveVenue}_${subtype}_${formattedTime}`;
+    // Generate unique session_key using hash
+    const keyData = `${dateStr}${venue}${type}${subtype}${startTime}${endTime}${seats}`;
+    const hash = Math.abs(keyData.split('').reduce((a, c) => ((a << 5) - a) + c.charCodeAt(0), 0));
+    const session_key = `${dateStr.substring(2).replace(/-/g, '')}_${hash.toString(36).substring(0, 6)}`;
+
+    // Format display name
+    const name = `${month}/${date}_${venue}_${subtype}_${formatTo12Hour(startTime)}`;
 
     const params = {
-        session_key: session_key,
-        name: name,
-        session_start: `${dateString} ${startTime}`,
-        session_end: `${dateString} ${endTime}`,
+        session_key,
+        name,
+        session_start: `${dateStr} ${startTime}`,
+        session_end: `${dateStr} ${endTime}`,
         session_type: type,
         session_subtype: subtype,
-        venue: descriptiveVenue,
-        seats: seats,
+        venue,
+        seats,
         frozen: frozen ? 'Y' : 'N'
     };
 
     try {
         await addSession(apiKey, params);
-        appendResults(`Added: ${name}`);
+        appendResults(`✓ ${name}`);
     } catch (error) {
-        // Ignore "Failed to fetch" errors (CORS issues) - the slot was likely created
-        if (error.message === 'Failed to fetch') {
-            appendResults(`Added (CORS warning): ${name}`);
-        } else {
-            throw error;
-        }
+        appendResults(`✗ ${name} - ${error.message}`);
+        throw error;
     }
     await sleep(500);
 }
 
 async function createLeadershipSlotsForDay(apiKey, day, config) {
-    appendResults(`--- Creating leadership slots for ${config.venue} on ${day.toDateString()} ---`);
-    const descriptiveVenue = config.venue;
+    appendResults(`--- Leadership: ${config.venue} - ${day.toDateString()} ---`);
 
-    // Create leadership role slots
+    // Leadership roles (Chair, Encounter, etc.)
     for (const role of leadershipRoles) {
-        await addSlot(apiKey, day, "Leadership", role.name, descriptiveVenue, config.leadership_times.start, config.leadership_times.end, role.seats);
+        await addSlot(apiKey, day, "Leadership", role.name, config.venue,
+            config.leadership_times.start, config.leadership_times.end, role.seats);
     }
 
-    // Create leadership volunteer slots
-    if (config.leadership_volunteer_slots) {
-        for (const slot of config.leadership_volunteer_slots) {
-            await addSlot(apiKey, day, "Leadership", slot.name, descriptiveVenue, slot.start, slot.end, slot.seats);
-        }
+    // Leadership volunteer slots
+    for (const slot of config.leadership_volunteer_slots || []) {
+        await addSlot(apiKey, day, "Leadership", slot.name, config.venue, slot.start, slot.end, slot.seats);
     }
 }
 
 async function createGeneralSlotsForDay(apiKey, day, config) {
-    appendResults(`--- Creating general volunteer slots for ${config.venue} on ${day.toDateString()} ---`);
-    const descriptiveVenue = config.venue;
+    appendResults(`--- General: ${config.venue} - ${day.toDateString()} ---`);
 
-    // Create general slots (MS3/MS4/AI, Ophtho, etc.)
-    if (config.general) {
-        for (const slot of config.general) {
-            await addSlot(apiKey, day, "General", slot.name, descriptiveVenue, slot.start, slot.end, slot.seats);
-        }
+    // General slots (MS3/MS4/AI, Ophtho, Family Planning, etc.)
+    for (const slot of config.general || []) {
+        await addSlot(apiKey, day, "General", slot.name, config.venue, slot.start, slot.end, slot.seats);
     }
 
-    // Create shift-based slots (Experienced, New)
-    if (config.shifts) {
-        for (const subtype in config.shifts) {
-            for (const shift of config.shifts[subtype]) {
-                await addSlot(apiKey, day, "General", subtype, descriptiveVenue, shift.s, shift.e, shift.c);
-            }
+    // Shift-based slots (Experienced, New)
+    for (const subtype in config.shifts || {}) {
+        for (const shift of config.shifts[subtype]) {
+            await addSlot(apiKey, day, "General", subtype, config.venue, shift.s, shift.e, shift.c);
         }
     }
 }
@@ -289,196 +271,90 @@ document.addEventListener('DOMContentLoaded', function() {
 // =================================================================
 
 document.addEventListener('DOMContentLoaded', function() {
-    const loadMonthBtn = document.getElementById('loadMonthBtn');
+    document.getElementById('loadMonthBtn').addEventListener('click', () => {
+        const selectedDate = document.getElementById('month-select').value;
+        if (!selectedDate) return alert('Please select a month and year.');
 
-    loadMonthBtn.addEventListener('click', async () => {
-        try {
-            const monthInput = document.getElementById('month-select');
-            const selectedDate = monthInput.value;
+        clearResults();
+        const [year, month] = selectedDate.split('-');
+        loadedMonthData = {
+            year: parseInt(year),
+            month: parseInt(month),
+            monthString: selectedDate
+        };
 
-            if (!selectedDate) {
-                alert('Error: Please select a month and year.');
-                return;
+        appendResults(`✓ Month loaded: ${selectedDate}\n`);
+    });
+});
+
+// Clinic schedule mapping: day of week → week number → clinic type
+const CLINIC_SCHEDULE = {
+    2: { 3: "Ob_Gyn" },  // Tuesday: Week 3 = Ob/Gyn, others = Medicine
+    4: { 1: "Derm", 2: "Psych_Rheum", 3: "Surgery_ENT", 4: "Psych" },  // Thursday
+    6: { 2: "Neuro", 4: "Neuro" }  // Saturday: Weeks 2,4 = Neuro, others = Medicine_Sat
+};
+
+// Helper: Get clinic type for a given day
+function getClinicType(dayOfWeek, weekNumber) {
+    const typeMap = CLINIC_SCHEDULE[dayOfWeek];
+    if (!typeMap) return null;
+
+    let clinicType = typeMap[weekNumber] || "Medicine";
+    if (dayOfWeek === 6 && clinicType === "Medicine") {
+        clinicType = "Medicine_Sat";
+    }
+    return clinicType;
+}
+
+// Helper: Create slots for entire month
+async function createSlotsForMonth(apiKey, slotCreator) {
+    if (!apiKeyInput.value.trim()) return alert('Please enter your API Key.');
+    if (!loadedMonthData) return alert('Please load a month first.');
+
+    clearResults();
+    appendResults(`Creating slots for ${loadedMonthData.monthString}...\n`);
+
+    const { year, month } = loadedMonthData;
+    const counters = { 2: 0, 4: 0, 6: 0 };
+    let day = new Date(year, month - 1, 1);
+    const lastDay = new Date(year, month, 0);
+
+    while (day <= lastDay) {
+        const dayOfWeek = day.getDay();
+        if (counters[dayOfWeek] !== undefined) {
+            counters[dayOfWeek]++;
+            const clinicType = getClinicType(dayOfWeek, counters[dayOfWeek]);
+
+            if (clinicType && clinicConfigs[clinicType]) {
+                await slotCreator(apiKey, new Date(day), clinicConfigs[clinicType]);
             }
+        }
+        day.setDate(day.getDate() + 1);
+    }
 
-            // Clear previous results
-            clearResults();
+    appendResults('\n✓ Complete!');
+}
 
-            const [year, month] = selectedDate.split('-');
-            const monthNum = parseInt(month, 10);
-            const yearNum = parseInt(year, 10);
+// =================================================================
+// ==================== BUTTON EVENT HANDLERS ======================
+// =================================================================
 
-            // Store the loaded month data in memory
-            loadedMonthData = {
-                year: yearNum,
-                month: monthNum,
-                monthString: `${year}-${month}`,
-                loadedAt: new Date().toLocaleString()
-            };
-
-            appendResults(`Month loaded successfully!\n${'='.repeat(50)}`);
-            appendResults(`Year: ${loadedMonthData.year}`);
-            appendResults(`Month: ${loadedMonthData.month}`);
-            appendResults(`Month String: ${loadedMonthData.monthString}`);
-            appendResults(`Loaded At: ${loadedMonthData.loadedAt}`);
-            appendResults(`${'='.repeat(50)}\n`);
-            appendResults('Month data is now stored in memory for future operations.');
-
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('createLeadershipSlotsBtn').addEventListener('click', async () => {
+        try {
+            await createSlotsForMonth(apiKeyInput.value.trim(), createLeadershipSlotsForDay);
         } catch (error) {
-            appendResults(`\nAn error occurred: ${error.message}`);
-            console.error('Error loading month:', error);
+            appendResults(`\nError: ${error.message}`);
         }
     });
 });
 
-// =================================================================
-// ================ CREATE LEADERSHIP SLOTS BUTTON =================
-// =================================================================
-
 document.addEventListener('DOMContentLoaded', function() {
-    const createLeadershipSlotsBtn = document.getElementById('createLeadershipSlotsBtn');
-
-    createLeadershipSlotsBtn.addEventListener('click', async () => {
+    document.getElementById('createGeneralSlotsBtn').addEventListener('click', async () => {
         try {
-            const apiKey = apiKeyInput.value.trim();
-
-            if (!apiKey) {
-                alert('Error: Please enter your API Key.');
-                return;
-            }
-
-            if (!loadedMonthData) {
-                alert('Error: Please load a month first.');
-                return;
-            }
-
-            // Clear previous results
-            clearResults();
-
-            appendResults('Creating leadership slots for the month...\n' + '='.repeat(50));
-            appendResults(`Month: ${loadedMonthData.monthString}`);
-            appendResults('='.repeat(50) + '\n');
-
-            const year = loadedMonthData.year;
-            const month = loadedMonthData.month;
-
-            // Day type mapping: which clinic type occurs on which week of the month
-            const dayTypeMap = {
-                2: { 1: "Medicine_NoOphtho", 3: "Ob_Gyn" },           // Tuesday
-                4: { 1: "Derm", 2: "Psych_Rheum", 3: "Surgery_ENT", 4: "Psych" }, // Thursday
-                6: { 2: "Neuro", 4: "Neuro" }   // Saturday
-            };
-            let counters = { 2: 0, 4: 0, 6: 0 };
-
-            let currentDay = new Date(year, month - 1, 1);
-            const lastDay = new Date(year, month, 0);
-
-            // Iterate through each day of the month
-            while (currentDay <= lastDay) {
-                const dayOfWeek = currentDay.getDay();
-
-                if (counters[dayOfWeek] !== undefined) {
-                    counters[dayOfWeek]++;
-                    let clinicTypeKey = (dayTypeMap[dayOfWeek] && dayTypeMap[dayOfWeek][counters[dayOfWeek]]) || "Medicine";
-
-                    // Special case for Saturday Medicine clinics
-                    if (dayOfWeek === 6 && clinicTypeKey === "Medicine") {
-                        clinicTypeKey = "Medicine_Sat";
-                    }
-
-                    // Create leadership slots if configuration exists
-                    if (clinicConfigs[clinicTypeKey]) {
-                        await createLeadershipSlotsForDay(apiKey, new Date(currentDay), clinicConfigs[clinicTypeKey]);
-                    } else {
-                        appendResults(`Warning: No config found for ${clinicTypeKey}`);
-                    }
-                }
-
-                currentDay.setDate(currentDay.getDate() + 1);
-            }
-
-            appendResults('\n' + '='.repeat(50));
-            appendResults('All leadership slots created successfully!');
-
+            await createSlotsForMonth(apiKeyInput.value.trim(), createGeneralSlotsForDay);
         } catch (error) {
-            appendResults(`\nAn error occurred: ${error.message}`);
-            console.error('Error creating leadership slots:', error);
-        }
-    });
-});
-
-// =================================================================
-// ================ CREATE GENERAL SLOTS BUTTON ====================
-// =================================================================
-
-document.addEventListener('DOMContentLoaded', function() {
-    const createGeneralSlotsBtn = document.getElementById('createGeneralSlotsBtn');
-
-    createGeneralSlotsBtn.addEventListener('click', async () => {
-        try {
-            const apiKey = apiKeyInput.value.trim();
-
-            if (!apiKey) {
-                alert('Error: Please enter your API Key.');
-                return;
-            }
-
-            if (!loadedMonthData) {
-                alert('Error: Please load a month first.');
-                return;
-            }
-
-            // Clear previous results
-            clearResults();
-
-            appendResults('Creating general volunteer slots for the month...\n' + '='.repeat(50));
-            appendResults(`Month: ${loadedMonthData.monthString}`);
-            appendResults('='.repeat(50) + '\n');
-
-            const year = loadedMonthData.year;
-            const month = loadedMonthData.month;
-
-            // Day type mapping: which clinic type occurs on which week of the month
-            const dayTypeMap = {
-                2: { 1: "Medicine_NoOphtho", 3: "Ob_Gyn" },           // Tuesday
-                4: { 1: "Derm", 2: "Psych_Rheum", 3: "Surgery_ENT", 4: "Psych" }, // Thursday
-                6: { 2: "Neuro", 4: "Neuro" }   // Saturday
-            };
-            let counters = { 2: 0, 4: 0, 6: 0 };
-
-            let currentDay = new Date(year, month - 1, 1);
-            const lastDay = new Date(year, month, 0);
-
-            // Iterate through each day of the month
-            while (currentDay <= lastDay) {
-                const dayOfWeek = currentDay.getDay();
-
-                if (counters[dayOfWeek] !== undefined) {
-                    counters[dayOfWeek]++;
-                    let clinicTypeKey = (dayTypeMap[dayOfWeek] && dayTypeMap[dayOfWeek][counters[dayOfWeek]]) || "Medicine";
-
-                    // Special case for Saturday Medicine clinics
-                    if (dayOfWeek === 6 && clinicTypeKey === "Medicine") {
-                        clinicTypeKey = "Medicine_Sat";
-                    }
-
-                    // Create general volunteer slots if configuration exists
-                    if (clinicConfigs[clinicTypeKey]) {
-                        await createGeneralSlotsForDay(apiKey, new Date(currentDay), clinicConfigs[clinicTypeKey]);
-                    } else {
-                        appendResults(`Warning: No config found for ${clinicTypeKey}`);
-                    }
-                }
-
-                currentDay.setDate(currentDay.getDate() + 1);
-            }
-
-            appendResults('\n' + '='.repeat(50));
-            appendResults('All general volunteer slots created successfully!');
-
-        } catch (error) {
-            appendResults(`\nAn error occurred: ${error.message}`);
-            console.error('Error creating general volunteer slots:', error);
+            appendResults(`\nError: ${error.message}`);
         }
     });
 });
