@@ -20,6 +20,37 @@ app.post('/api/*', async (req, res) => {
     try {
         // Extract the path after /api/
         const apiPath = req.params[0];
+
+        // Special handling for ticket/user/get endpoint
+        if (apiPath === 'ticket/user/get') {
+            const apiKey = req.body.api_key;
+            const email = req.body.email;
+
+            const schedUrl = `https://${SUBDOMAIN}.sched.com/api/${apiPath}?api_key=${apiKey}`;
+
+            // Send JSON array as body
+            const response = await fetch(schedUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'STV-Sched-API/1.0'
+                },
+                body: JSON.stringify([{ email }])
+            });
+
+            const responseText = await response.text();
+
+            // Try to parse as JSON, otherwise return as text
+            try {
+                const jsonData = JSON.parse(responseText);
+                res.json(jsonData);
+            } catch (e) {
+                res.send(responseText);
+            }
+            return;
+        }
+
+        // Default handling for other endpoints
         const schedUrl = `https://${SUBDOMAIN}.sched.com/api/${apiPath}`;
 
         // Forward the request to Sched.com

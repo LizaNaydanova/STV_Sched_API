@@ -66,3 +66,29 @@ async function addSession(apiKey, options = {}) {
     };
     return schedApiCall('session/add', params, apiKey);
 }
+
+/**
+ * Gets all attendees and their selected sessions.
+ * @param {string} apiKey - Your Sched.com API key.
+ * @param {string} format - Output format: 'json' or 'csv' (default: 'json').
+ * @returns {Promise<any>} A promise that resolves with all users and their sessions.
+ */
+async function getAllUserSessions(apiKey, format = 'json') {
+    const params = {
+        format
+    };
+    return schedApiCall('user/sessions', params, apiKey);
+}
+
+/**
+ * Gets all tickets owned by a user.
+ * @param {string} apiKey - Your Sched.com API key.
+ * @param {string} email - Email address to get tickets for.
+ * @returns {Promise<any>} A promise that resolves with the user's tickets.
+ */
+async function getUserTickets(apiKey, email) {
+    const params = {
+        email
+    };
+    return schedApiCall('ticket/user/get', params, apiKey);
+}

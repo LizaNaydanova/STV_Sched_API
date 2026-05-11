@@ -358,3 +358,126 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+// =================================================================
+// ==================== GET USER SESSIONS BUTTON ===================
+// =================================================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('getUserSessionsBtn').addEventListener('click', async () => {
+        const apiKey = apiKeyInput.value.trim();
+        const username = document.getElementById('username').value.trim();
+
+        if (!apiKey) return alert('Please enter your API Key.');
+        if (!username) return alert('Please enter a username.');
+
+        clearResults();
+        appendResults(`Fetching sessions for user: ${username}...\n`);
+
+        try {
+            // Fetch all user sessions
+            appendResults('Retrieving all user sessions...');
+            const allSessions = await getAllUserSessions(apiKey, 'json');
+            appendResults('✓ Data retrieved\n');
+
+            // Filter sessions for the specified username
+            const userSessions = allSessions.filter(session =>
+                session.username && session.username.toLowerCase() === username.toLowerCase()
+            );
+
+            if (userSessions.length === 0) {
+                appendResults(`\n⚠ No sessions found for user: ${username}`);
+                return;
+            }
+
+            // Filter for checked-in sessions only
+            const checkedInSessions = userSessions.filter(session => session.checkin === 'Y');
+
+            appendResults(`\n✓ Total sessions signed up: ${userSessions.length}`);
+            appendResults(`✓ Checked-in sessions: ${checkedInSessions.length}\n`);
+
+            if (checkedInSessions.length === 0) {
+                appendResults(`\n⚠ User has not checked into any sessions yet.`);
+                return;
+            }
+
+            appendResults('\n--- Checked-In Sessions ---\n');
+
+            // Display each checked-in session
+            checkedInSessions.forEach((session, index) => {
+                appendResults(`\n${index + 1}. ${session.event_name || 'Unnamed Session'}`);
+                if (session.event_start) appendResults(`   Start: ${session.event_start}`);
+                if (session.event_end) appendResults(`   End: ${session.event_end}`);
+                if (session.venue) appendResults(`   Venue: ${session.venue}`);
+                if (session.checkin_date) appendResults(`   ✓ Checked in at: ${session.checkin_date}`);
+            });
+
+        } catch (error) {
+            appendResults(`\n✗ Error: ${error.message}`);
+            console.error('Full error:', error);
+        }
+    });
+});
+
+// =================================================================
+// ==================== GET USER TICKETS BUTTON ====================
+// =================================================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('getUserTicketsBtn').addEventListener('click', async () => {
+        const apiKey = apiKeyInput.value.trim();
+        const email = document.getElementById('ticketEmail').value.trim();
+
+        if (!apiKey) return alert('Please enter your API Key.');
+        if (!email) return alert('Please enter an email address.');
+
+        clearResults();
+        appendResults(`Fetching tickets for: ${email}...\n`);
+
+        try {
+            // Fetch user tickets
+            appendResults('Retrieving user tickets...');
+            const response = await getUserTickets(apiKey, email);
+            appendResults('✓ Data retrieved\n');
+
+            // Debug: show raw response
+            appendResults('\n--- Raw Response ---');
+            appendResults(JSON.stringify(response, null, 2));
+            appendResults('\n');
+
+            // Check response status
+            if (response.status === 'ERROR') {
+                appendResults(`\n✗ Error: ${response.message || 'User not found'}`);
+                return;
+            }
+
+            // Extract tickets from result
+            const userResults = response.result || [];
+
+            if (userResults.length === 0) {
+                appendResults(`\n⚠ No tickets found for: ${email}`);
+                return;
+            }
+
+            // Get tickets from the first (and should be only) user result
+            const userTickets = userResults[0]?.tickets || [];
+
+            if (userTickets.length === 0) {
+                appendResults(`\n⚠ User has no tickets.`);
+                return;
+            }
+
+            appendResults(`\n✓ Found ${userTickets.length} ticket(s)\n`);
+            appendResults('--- User Tickets ---\n');
+
+            // Display each ticket
+            userTickets.forEach((ticket, index) => {
+                appendResults(`\n${index + 1}. ${ticket}`);
+            });
+
+        } catch (error) {
+            appendResults(`\n✗ Error: ${error.message}`);
+            console.error('Full error:', error);
+        }
+    });
+});
