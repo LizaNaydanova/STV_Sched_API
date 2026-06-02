@@ -21,7 +21,7 @@ app.post('/api/*', async (req, res) => {
         // Extract the path after /api/
         const apiPath = req.params[0];
 
-        // Special handling for ticket/user/get endpoint
+        // Special handling for ticket/user endpoints (batch operations with JSON)
         if (apiPath === 'ticket/user/get') {
             const apiKey = req.body.api_key;
             const email = req.body.email;
@@ -36,6 +36,64 @@ app.post('/api/*', async (req, res) => {
                     'User-Agent': 'STV-Sched-API/1.0'
                 },
                 body: JSON.stringify([{ email }])
+            });
+
+            const responseText = await response.text();
+
+            // Try to parse as JSON, otherwise return as text
+            try {
+                const jsonData = JSON.parse(responseText);
+                res.json(jsonData);
+            } catch (e) {
+                res.send(responseText);
+            }
+            return;
+        }
+
+        // Special handling for ticket/user/put endpoint (add tickets)
+        if (apiPath === 'ticket/user/put') {
+            const apiKey = req.body.api_key;
+            const payload = req.body.payload;
+
+            const schedUrl = `https://${SUBDOMAIN}.sched.com/api/${apiPath}?api_key=${apiKey}`;
+
+            // Send JSON array as body
+            const response = await fetch(schedUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'STV-Sched-API/1.0'
+                },
+                body: payload
+            });
+
+            const responseText = await response.text();
+
+            // Try to parse as JSON, otherwise return as text
+            try {
+                const jsonData = JSON.parse(responseText);
+                res.json(jsonData);
+            } catch (e) {
+                res.send(responseText);
+            }
+            return;
+        }
+
+        // Special handling for ticket/user/delete endpoint (delete tickets)
+        if (apiPath === 'ticket/user/delete') {
+            const apiKey = req.body.api_key;
+            const payload = req.body.payload;
+
+            const schedUrl = `https://${SUBDOMAIN}.sched.com/api/${apiPath}?api_key=${apiKey}`;
+
+            // Send JSON array as body
+            const response = await fetch(schedUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'STV-Sched-API/1.0'
+                },
+                body: payload
             });
 
             const responseText = await response.text();

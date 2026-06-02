@@ -92,3 +92,31 @@ async function getUserTickets(apiKey, email) {
     };
     return schedApiCall('ticket/user/get', params, apiKey);
 }
+
+/**
+ * Adds tickets to a user.
+ * @param {string} apiKey - Your Sched.com API key.
+ * @param {string} email - Email address.
+ * @param {string[]} tickets - Array of ticket names to add.
+ * @returns {Promise<any>} A promise that resolves with the operation result.
+ */
+async function addTicketsToUser(apiKey, email, tickets) {
+    const params = {
+        payload: JSON.stringify([{ email, tickets }])
+    };
+    return schedApiCall('ticket/user/put', params, apiKey);
+}
+
+/**
+ * Deletes tickets from a user.
+ * @param {string} apiKey - Your Sched.com API key.
+ * @param {string} email - Email address.
+ * @param {string[]} tickets - Array of ticket names to delete.
+ * @returns {Promise<any>} A promise that resolves with the operation result.
+ */
+async function deleteTicketsFromUser(apiKey, email, tickets) {
+    const params = {
+        payload: JSON.stringify([{ email, tickets }])
+    };
+    return schedApiCall('ticket/user/delete', params, apiKey);
+}

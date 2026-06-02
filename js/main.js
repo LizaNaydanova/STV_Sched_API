@@ -481,3 +481,81 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+// =================================================================
+// ================ ADD "NEW" TICKET BUTTON ========================
+// =================================================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('addNewTicketBtn').addEventListener('click', async () => {
+        const apiKey = apiKeyInput.value.trim();
+        const email = document.getElementById('ticketUserEmail').value.trim();
+
+        if (!apiKey) return alert('Please enter your API Key.');
+        if (!email) return alert('Please enter an email.');
+
+        clearResults();
+        appendResults(`Adding "new" ticket to: ${email}...\n`);
+
+        try {
+            appendResults('Sending request to add ticket...');
+            const response = await addTicketsToUser(apiKey, email, ["new"]);
+            appendResults('✓ Request completed\n');
+
+            // Show response
+            appendResults('\n--- Response ---');
+            appendResults(JSON.stringify(response, null, 2));
+            appendResults('\n');
+
+            // Check if successful
+            if (response.status === 'OK' || response.status === 'PARTIAL') {
+                appendResults(`\n✓ Successfully added "new" ticket to ${username}`);
+            } else if (response.status === 'ERROR') {
+                appendResults(`\n✗ Error: ${response.message || 'Failed to add ticket'}`);
+            }
+
+        } catch (error) {
+            appendResults(`\n✗ Error: ${error.message}`);
+            console.error('Full error:', error);
+        }
+    });
+});
+
+// =================================================================
+// =============== DELETE "NEW" TICKET BUTTON ======================
+// =================================================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('deleteNewTicketBtn').addEventListener('click', async () => {
+        const apiKey = apiKeyInput.value.trim();
+        const email = document.getElementById('ticketUserEmail').value.trim();
+
+        if (!apiKey) return alert('Please enter your API Key.');
+        if (!email) return alert('Please enter an email.');
+
+        clearResults();
+        appendResults(`Deleting "new" ticket from: ${email}...\n`);
+
+        try {
+            appendResults('Sending request to delete ticket...');
+            const response = await deleteTicketsFromUser(apiKey, email, ["new"]);
+            appendResults('✓ Request completed\n');
+
+            // Show response
+            appendResults('\n--- Response ---');
+            appendResults(JSON.stringify(response, null, 2));
+            appendResults('\n');
+
+            // Check if successful
+            if (response.status === 'OK' || response.status === 'PARTIAL') {
+                appendResults(`\n✓ Successfully deleted "new" ticket from ${username}`);
+            } else if (response.status === 'ERROR') {
+                appendResults(`\n✗ Error: ${response.message || 'Failed to delete ticket'}`);
+            }
+
+        } catch (error) {
+            appendResults(`\n✗ Error: ${error.message}`);
+            console.error('Full error:', error);
+        }
+    });
+});
