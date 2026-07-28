@@ -4,6 +4,7 @@
 
 // Store the loaded month data in memory
 let loadedMonthData = null;
+const isBrowser = typeof document !== 'undefined';
 
 // Leadership roles configuration
 const leadershipRoles = [
@@ -254,38 +255,46 @@ let resultsOutput;
 let apiKeyInput;
 
 function appendResults(text) {
-    resultsOutput.textContent += text + "\n";
+    if (resultsOutput) {
+        resultsOutput.textContent += text + "\n";
+    }
 }
 
 function clearResults() {
-    resultsOutput.textContent = '';
+    if (resultsOutput) {
+        resultsOutput.textContent = '';
+    }
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    resultsOutput = document.getElementById('resultsOutput');
-    apiKeyInput = document.getElementById('apiKey');
-});
+if (isBrowser) {
+    document.addEventListener('DOMContentLoaded', function() {
+        resultsOutput = document.getElementById('resultsOutput');
+        apiKeyInput = document.getElementById('apiKey');
+    });
+}
 
 // =================================================================
 // ====================== LOAD MONTH BUTTON ========================
 // =================================================================
 
-document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('loadMonthBtn').addEventListener('click', () => {
-        const selectedDate = document.getElementById('month-select').value;
-        if (!selectedDate) return alert('Please select a month and year.');
+if (isBrowser) {
+    document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('loadMonthBtn').addEventListener('click', () => {
+            const selectedDate = document.getElementById('month-select').value;
+            if (!selectedDate) return alert('Please select a month and year.');
 
-        clearResults();
-        const [year, month] = selectedDate.split('-');
-        loadedMonthData = {
-            year: parseInt(year),
-            month: parseInt(month),
-            monthString: selectedDate
-        };
+            clearResults();
+            const [year, month] = selectedDate.split('-');
+            loadedMonthData = {
+                year: parseInt(year),
+                month: parseInt(month),
+                monthString: selectedDate
+            };
 
-        appendResults(`✓ Month loaded: ${selectedDate}\n`);
+            appendResults(`✓ Month loaded: ${selectedDate}\n`);
+        });
     });
-});
+}
 
 // Clinic schedule mapping: day of week → week number → clinic type
 const CLINIC_SCHEDULE = {
@@ -307,14 +316,34 @@ function getClinicType(dayOfWeek, weekNumber) {
 }
 
 // Helper: Create slots for entire month
-async function createSlotsForMonth(apiKey, slotCreator) {
-    if (!apiKeyInput.value.trim()) return alert('Please enter your API Key.');
-    if (!loadedMonthData) return alert('Please load a month first.');
+async function createSlotsForMonth(apiKey, slotCreator, options = {}) {
+    const monthData = options.monthData || loadedMonthData;
+    const apiKeyValue = (options.apiKey || apiKey || '').trim();
+    const clearOutput = options.clearOutput || clearResults;
+    const appendOutput = options.appendOutput || appendResults;
 
-    clearResults();
-    appendResults(`Creating slots for ${loadedMonthData.monthString}...\n`);
+    if (!apiKeyValue) {
+        const error = new Error('Please enter your API Key.');
+        if (isBrowser && typeof alert === 'function' && !options.silent) {
+            alert(error.message);
+            return;
+        }
+        throw error;
+    }
 
-    const { year, month } = loadedMonthData;
+    if (!monthData) {
+        const error = new Error('Please load a month first.');
+        if (isBrowser && typeof alert === 'function' && !options.silent) {
+            alert(error.message);
+            return;
+        }
+        throw error;
+    }
+
+    clearOutput();
+    appendOutput(`Creating slots for ${monthData.monthString}...\n`);
+
+    const { year, month } = monthData;
     const counters = { 2: 0, 4: 0, 6: 0 };
     let day = new Date(year, month - 1, 1);
     const lastDay = new Date(year, month, 0);
@@ -326,35 +355,50 @@ async function createSlotsForMonth(apiKey, slotCreator) {
             const clinicType = getClinicType(dayOfWeek, counters[dayOfWeek]);
 
             if (clinicType && clinicConfigs[clinicType]) {
-                await slotCreator(apiKey, new Date(day), clinicConfigs[clinicType]);
+                await slotCreator(apiKeyValue, new Date(day), clinicConfigs[clinicType]);
             }
         }
         day.setDate(day.getDate() + 1);
     }
 
-    appendResults('\n✓ Complete!');
+    appendOutput('\n✓ Complete!');
 }
 
 // =================================================================
 // ==================== BUTTON EVENT HANDLERS ======================
 // =================================================================
 
-document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('createLeadershipSlotsBtn').addEventListener('click', async () => {
-        try {
-            await createSlotsForMonth(apiKeyInput.value.trim(), createLeadershipSlotsForDay);
-        } catch (error) {
-            appendResults(`\nError: ${error.message}`);
-        }
+if (isBrowser) {
+    document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('createLeadershipSlotsBtn').addEventListener('click', async () => {
+            try {
+                await createSlotsForMonth(apiKeyInput.value.trim(), createLeadershipSlotsForDay);
+            } catch (error) {
+                appendResults(`\nError: ${error.message}`);
+            }
+        });
     });
-});
+}
 
-document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('createGeneralSlotsBtn').addEventListener('click', async () => {
-        try {
-            await createSlotsForMonth(apiKeyInput.value.trim(), createGeneralSlotsForDay);
-        } catch (error) {
-            appendResults(`\nError: ${error.message}`);
-        }
+if (isBrowser) {
+    document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('createGeneralSlotsBtn').addEventListener('click', async () => {
+            try {
+                await createSlotsForMonth(apiKeyInput.value.trim(), createGeneralSlotsForDay);
+            } catch (error) {
+                appendResults(`\nError: ${error.message}`);
+            }
+        });
     });
-});
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        createSlotsForMonth,
+        createLeadershipSlotsForDay,
+        createGeneralSlotsForDay,
+        getClinicType,
+        clinicConfigs
+    };
+}
+
