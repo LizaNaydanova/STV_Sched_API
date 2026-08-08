@@ -59,11 +59,35 @@ async function fetchAllSessions() {
     return sessions;
 }
 
+// Sched's session/export doesn't document its exact field name/format for the
+// start date (it may differ from the 'session_start: YYYY-MM-DD HH:MM' used by
+// session/add), so instead of relying on one field, scan every string field of
+// each session for any common representation of the target date.
+function dateVariants(dateStr) {
+    const [y, m, d] = dateStr.split('-');
+    const mNoZero = String(parseInt(m, 10));
+    const dNoZero = String(parseInt(d, 10));
+    return [
+        dateStr, // 2026-08-29
+        `${m}/${d}/${y}`, // 08/29/2026
+        `${mNoZero}/${dNoZero}/${y}`, // 8/29/2026
+        `${m}-${d}-${y}`, // 08-29-2026
+        `${y}/${m}/${d}` // 2026/08/29
+    ];
+}
+
+function sessionMatchesDate(session, dateStr) {
+    const variants = dateVariants(dateStr);
+    return Object.values(session).some(
+        (v) => typeof v === 'string' && variants.some((variant) => v.includes(variant))
+    );
+}
+
 function selectTargets(allSessions) {
     if (SESSION_KEY) {
         return allSessions.filter((s) => s.session_key === SESSION_KEY);
     }
-    return allSessions.filter((s) => typeof s.session_start === 'string' && s.session_start.startsWith(TARGET_DATE));
+    return allSessions.filter((s) => sessionMatchesDate(s, TARGET_DATE));
 }
 
 async function main() {
@@ -79,6 +103,11 @@ async function main() {
     console.log(SESSION_KEY
         ? `Matched ${targets.length} session(s) for session_key=${SESSION_KEY}.`
         : `Matched ${targets.length} session(s) on ${TARGET_DATE}.`);
+
+    if (targets.length === 0 && allSessions.length > 0) {
+        console.log('\nNo matches - dumping a sample session so the field names/format can be inspected:');
+        console.log(JSON.stringify(allSessions[0], null, 2));
+    }
 
     const toChange = targets.filter((s) => s.frozen !== FREEZE_VALUE);
     const alreadyCorrect = targets.length - toChange.length;
