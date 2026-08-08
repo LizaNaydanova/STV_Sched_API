@@ -2,9 +2,9 @@ name: Freeze August 29 Shifts
 
 on:
   schedule:
-    # 01:30 UTC Aug 8 = 8:30 PM CDT Aug 7, 2026 (one-time; guarded below against
+    # 02:00 UTC Aug 8 = 9:00 PM CDT Aug 7, 2026 (one-time; guarded below against
     # firing on this same cron in future years, since GitHub cron has no year field).
-    - cron: '30 1 8 8 *'
+    - cron: '0 2 8 8 *'
   workflow_dispatch:
     inputs:
       dry_run:
