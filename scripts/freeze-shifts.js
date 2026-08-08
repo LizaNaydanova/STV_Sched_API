@@ -11,14 +11,13 @@
 //   FREEZE_VALUE      (default: Y) 'Y' or 'N'
 //   DRY_RUN           (default: false) 'true' to preview without writing
 //
-// IMPORTANT: session/mod does NOT support the custom `frozen` field (confirmed
-// live - it returns "Ok" but silently drops it). session/add, called again
-// with an existing session_key, is used instead: this app's own addSlot()
-// generates a deterministic session_key precisely so createSlotsForMonth can
-// be re-run safely, which only works if session/add upserts by session_key
-// rather than erroring on a duplicate key. To avoid clobbering data on
-// upsert, every field currently on the session is resent unchanged, with
-// only `frozen` changed.
+// IMPORTANT: confirmed live against the real event that neither
+// session/mod (returns "Ok" but silently drops the frozen field) nor
+// session/add (create-only - errors "already exists and is active" on a
+// duplicate session_key) can change frozen on an existing session.
+// session/add's own error message says "Use api/event/mod to modify data
+// for this event" - an undocumented endpoint distinct from session/mod,
+// which this script uses instead.
 const fetch = require('node-fetch');
 
 const SCHED_API_KEY = process.env.SCHED_API_KEY;
@@ -121,15 +120,7 @@ function getField(session, ...candidates) {
 // while id was an unrelated 32-char internal hash.
 const getKey = (s) => getField(s, 'session_key', 'event_key', 'key', 'session_id');
 const getFrozen = (s) => getField(s, 'frozen');
-const getName = (s) => getField(s, 'name');
 const getStart = (s) => getField(s, 'session_start', 'event_start', 'start', 'session_date', 'date');
-const getEnd = (s) => getField(s, 'session_end', 'event_end', 'end');
-const getType = (s) => getField(s, 'session_type', 'event_type');
-const getSubtype = (s) => getField(s, 'session_subtype', 'event_subtype');
-const getVenue = (s) => getField(s, 'venue');
-const getSeats = (s) => getField(s, 'seats');
-const getDescription = (s) => getField(s, 'description');
-const getActive = (s) => getField(s, 'active');
 
 function selectTargets(allSessions) {
     if (SESSION_KEY) {
@@ -138,22 +129,15 @@ function selectTargets(allSessions) {
     return allSessions.filter((s) => sessionMatchesDate(s, TARGET_DATE));
 }
 
-// Resend every field currently on the session (as understood from export)
-// so the session/add upsert doesn't clobber anything - only frozen changes.
-function buildUpsertParams(s) {
-    return {
-        session_key: getKey(s),
-        name: getName(s),
-        session_start: getStart(s),
-        session_end: getEnd(s),
-        session_type: getType(s),
-        session_subtype: getSubtype(s),
-        venue: getVenue(s),
-        seats: getSeats(s),
-        description: getDescription(s),
-        active: getActive(s),
-        frozen: FREEZE_VALUE
-    };
+// A live test confirmed session/add is create-only: calling it again with an
+// existing session_key returns "ERR: Session Key '...' already exists and is
+// active! Use api/event/mod to modify data for this event." - Sched's own
+// error message pointing at an undocumented endpoint, distinct from
+// session/mod (which silently drops the frozen field). Export data is also
+// entirely event_*-prefixed, not session_*-prefixed, reinforcing that
+// event/mod is the real modify endpoint for this API generation.
+function isErrorResponse(response) {
+    return typeof response === 'string' && /^err/i.test(response.trim());
 }
 
 async function main() {
@@ -194,7 +178,7 @@ async function main() {
     }
 
     if (DRY_RUN) {
-        console.log('\n[DRY RUN] Would upsert via session/add to set frozen=%s on:', FREEZE_VALUE);
+        console.log('\n[DRY RUN] Would call event/mod to set frozen=%s on:', FREEZE_VALUE);
         for (const s of toChange) {
             console.log(`  - ${getKey(s)}  ${s.name}  (${getStart(s)})`);
         }
@@ -205,12 +189,17 @@ async function main() {
     for (const s of toChange) {
         const key = getKey(s);
         try {
-            const response = await schedApiCall('session/add', buildUpsertParams(s));
-            results.push({ session_key: key, name: s.name, ok: true });
-            console.log(`✓ upsert sent: ${key}  ${s.name}  (response: ${JSON.stringify(response)})`);
+            const response = await schedApiCall('event/mod', { session_key: key, frozen: FREEZE_VALUE });
+            if (isErrorResponse(response)) {
+                results.push({ session_key: key, name: s.name, ok: false, error: response });
+                console.log(`✗ event/mod rejected: ${key}  ${s.name} - ${response}`);
+            } else {
+                results.push({ session_key: key, name: s.name, ok: true });
+                console.log(`✓ event/mod sent: ${key}  ${s.name}  (response: ${JSON.stringify(response)})`);
+            }
         } catch (error) {
             results.push({ session_key: key, name: s.name, ok: false, error: error.message });
-            console.log(`✗ upsert failed: ${key}  ${s.name} - ${error.message}`);
+            console.log(`✗ event/mod failed: ${key}  ${s.name} - ${error.message}`);
         }
         await sleep(500);
     }
@@ -220,7 +209,7 @@ async function main() {
     const verifyByKey = new Map(verifySessions.map((s) => [getKey(s), s]));
 
     if (verifySessions.length !== initialCount) {
-        console.log(`\n🚨 CRITICAL: session count changed from ${initialCount} to ${verifySessions.length} - session/add may have created duplicates instead of updating in place. Investigate before trusting this run.`);
+        console.log(`\n🚨 CRITICAL: session count changed from ${initialCount} to ${verifySessions.length} - event/mod may have created a duplicate instead of updating in place. Investigate before trusting this run.`);
     }
 
     let failures = 0;
