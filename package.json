@@ -4,7 +4,8 @@
   "description": "Sched.com API proxy for St. Vincent's Clinic scheduling",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "freeze": "node scripts/freeze-shifts.js"
   },
   "keywords": ["sched", "api", "proxy"],
   "author": "",
