@@ -204,7 +204,7 @@ async function main() {
         await sleep(500);
     }
 
-    console.log('\nVerifying changes actually persisted...');
+    console.log('\nRe-checking via session/export (best-effort - frozen has been observed to not read back through export even on a confirmed-successful write)...');
     const verifySessions = await fetchAllSessions();
     const verifyByKey = new Map(verifySessions.map((s) => [getKey(s), s]));
 
@@ -212,19 +212,32 @@ async function main() {
         console.log(`\n🚨 CRITICAL: session count changed from ${initialCount} to ${verifySessions.length} - event/mod may have created a duplicate instead of updating in place. Investigate before trusting this run.`);
     }
 
+    // A write is only treated as failed if event/mod itself errored, or the
+    // re-read explicitly came back with a different value. If frozen just
+    // isn't present in the export (getFrozen returns undefined), that's
+    // "can't confirm via this read path", not evidence the write failed.
     let failures = 0;
+    let unconfirmed = 0;
     for (const r of results) {
-        const current = verifyByKey.get(r.session_key);
-        const verified = r.ok && current && getFrozen(current) === FREEZE_VALUE;
-        if (!verified) {
+        if (!r.ok) {
             failures += 1;
-            console.log(`✗ VERIFY FAILED: ${r.session_key}  ${r.name}  (frozen is now '${current ? getFrozen(current) : 'unknown'}')`);
-        } else {
+            console.log(`✗ FAILED: ${r.session_key}  ${r.name} - ${r.error}`);
+            continue;
+        }
+        const current = verifyByKey.get(r.session_key);
+        const readBack = current ? getFrozen(current) : undefined;
+        if (readBack === FREEZE_VALUE) {
             console.log(`✓ verified: ${r.session_key}  ${r.name}`);
+        } else if (readBack === undefined) {
+            unconfirmed += 1;
+            console.log(`~ sent ok, unconfirmed (frozen not present in export): ${r.session_key}  ${r.name}`);
+        } else {
+            failures += 1;
+            console.log(`✗ VERIFY FAILED: ${r.session_key}  ${r.name}  (frozen read back as '${readBack}', expected '${FREEZE_VALUE}')`);
         }
     }
 
-    console.log(`\nDone. ${results.length - failures}/${results.length} verified as frozen='${FREEZE_VALUE}'.`);
+    console.log(`\nDone. ${results.length - failures}/${results.length} sent successfully (${unconfirmed} unconfirmed via export, ${failures} failed).`);
     if (failures > 0 || verifySessions.length !== initialCount) {
         process.exitCode = 1;
     }
