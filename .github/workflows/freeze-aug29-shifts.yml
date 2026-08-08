@@ -40,7 +40,9 @@ jobs:
         with:
           node-version: '20'
 
-      - run: npm ci
+      - run: npm install
+        # package-lock.json is gitignored in this repo, so `npm ci` (which
+        # requires a committed lockfile) isn't usable here.
 
       - name: Run freeze script
         env:
