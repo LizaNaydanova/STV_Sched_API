@@ -83,9 +83,29 @@ function sessionMatchesDate(session, dateStr) {
     );
 }
 
+// The exact field names returned by session/export aren't documented and may
+// not match the 'session_key'/'session_start'/'frozen' names used as input to
+// session/add - resolve by exact name first, then case-insensitively.
+function getField(session, ...candidates) {
+    for (const c of candidates) {
+        if (session[c] !== undefined) return session[c];
+    }
+    const lowerMap = {};
+    for (const k of Object.keys(session)) lowerMap[k.toLowerCase()] = k;
+    for (const c of candidates) {
+        const realKey = lowerMap[c.toLowerCase()];
+        if (realKey !== undefined && session[realKey] !== undefined) return session[realKey];
+    }
+    return undefined;
+}
+
+const getKey = (s) => getField(s, 'session_key', 'key', 'id', 'session_id');
+const getFrozen = (s) => getField(s, 'frozen');
+const getStart = (s) => getField(s, 'session_start', 'start', 'event_start', 'session_date', 'date');
+
 function selectTargets(allSessions) {
     if (SESSION_KEY) {
-        return allSessions.filter((s) => s.session_key === SESSION_KEY);
+        return allSessions.filter((s) => getKey(s) === SESSION_KEY);
     }
     return allSessions.filter((s) => sessionMatchesDate(s, TARGET_DATE));
 }
@@ -104,13 +124,21 @@ async function main() {
         ? `Matched ${targets.length} session(s) for session_key=${SESSION_KEY}.`
         : `Matched ${targets.length} session(s) on ${TARGET_DATE}.`);
 
-    if (targets.length === 0 && allSessions.length > 0) {
+    if (targets.length > 0) {
+        console.log('\nSample matched session (verify field names look right):');
+        console.log(JSON.stringify(targets[0], null, 2));
+    } else if (allSessions.length > 0) {
         console.log('\nNo matches - dumping a sample session so the field names/format can be inspected:');
         console.log(JSON.stringify(allSessions[0], null, 2));
     }
 
-    const toChange = targets.filter((s) => s.frozen !== FREEZE_VALUE);
-    const alreadyCorrect = targets.length - toChange.length;
+    const missingKey = targets.filter((s) => getKey(s) === undefined);
+    if (missingKey.length > 0) {
+        console.log(`\nWARNING: ${missingKey.length} matched session(s) have no resolvable session_key field - they will be skipped. Check the sample dump above for the real field name.`);
+    }
+
+    const toChange = targets.filter((s) => getKey(s) !== undefined && getFrozen(s) !== FREEZE_VALUE);
+    const alreadyCorrect = targets.length - missingKey.length - toChange.length;
     console.log(`${alreadyCorrect} already frozen='${FREEZE_VALUE}' (skipped). ${toChange.length} need updating.`);
 
     if (toChange.length === 0) {
@@ -121,35 +149,36 @@ async function main() {
     if (DRY_RUN) {
         console.log('\n[DRY RUN] Would set frozen=%s on:', FREEZE_VALUE);
         for (const s of toChange) {
-            console.log(`  - ${s.session_key}  ${s.name}  (${s.session_start})`);
+            console.log(`  - ${getKey(s)}  ${s.name}  (${getStart(s)})`);
         }
         return;
     }
 
     const results = [];
     for (const s of toChange) {
+        const key = getKey(s);
         try {
-            await schedApiCall('session/mod', { session_key: s.session_key, frozen: FREEZE_VALUE });
-            results.push({ session_key: s.session_key, name: s.name, ok: true });
-            console.log(`✓ mod sent: ${s.session_key}  ${s.name}`);
+            await schedApiCall('session/mod', { session_key: key, frozen: FREEZE_VALUE });
+            results.push({ session_key: key, name: s.name, ok: true });
+            console.log(`✓ mod sent: ${key}  ${s.name}`);
         } catch (error) {
-            results.push({ session_key: s.session_key, name: s.name, ok: false, error: error.message });
-            console.log(`✗ mod failed: ${s.session_key}  ${s.name} - ${error.message}`);
+            results.push({ session_key: key, name: s.name, ok: false, error: error.message });
+            console.log(`✗ mod failed: ${key}  ${s.name} - ${error.message}`);
         }
         await sleep(500);
     }
 
     console.log('\nVerifying changes actually persisted (frozen is undocumented for session/mod)...');
     const verifySessions = await fetchAllSessions();
-    const verifyByKey = new Map(verifySessions.map((s) => [s.session_key, s]));
+    const verifyByKey = new Map(verifySessions.map((s) => [getKey(s), s]));
 
     let failures = 0;
     for (const r of results) {
         const current = verifyByKey.get(r.session_key);
-        const verified = r.ok && current && current.frozen === FREEZE_VALUE;
+        const verified = r.ok && current && getFrozen(current) === FREEZE_VALUE;
         if (!verified) {
             failures += 1;
-            console.log(`✗ VERIFY FAILED: ${r.session_key}  ${r.name}  (frozen is now '${current ? current.frozen : 'unknown'}')`);
+            console.log(`✗ VERIFY FAILED: ${r.session_key}  ${r.name}  (frozen is now '${current ? getFrozen(current) : 'unknown'}')`);
         } else {
             console.log(`✓ verified: ${r.session_key}  ${r.name}`);
         }
