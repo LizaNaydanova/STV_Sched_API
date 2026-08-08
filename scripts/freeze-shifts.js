@@ -1,5 +1,5 @@
 // Freezes (or unfreezes) Sched.com sessions on a given date by setting the
-// custom `frozen` field via session/mod. Run directly (locally or from CI):
+// custom `frozen` field. Run directly (locally or from CI):
 //
 //   SCHED_API_KEY=xxx node scripts/freeze-shifts.js
 //
@@ -9,7 +9,16 @@
 //   TARGET_DATE       (default: 2026-08-29) YYYY-MM-DD, ignored if SESSION_KEY is set
 //   SESSION_KEY       (optional) freeze/unfreeze a single session, for testing
 //   FREEZE_VALUE      (default: Y) 'Y' or 'N'
-//   DRY_RUN           (default: false) 'true' to preview without calling session/mod
+//   DRY_RUN           (default: false) 'true' to preview without writing
+//
+// IMPORTANT: session/mod does NOT support the custom `frozen` field (confirmed
+// live - it returns "Ok" but silently drops it). session/add, called again
+// with an existing session_key, is used instead: this app's own addSlot()
+// generates a deterministic session_key precisely so createSlotsForMonth can
+// be re-run safely, which only works if session/add upserts by session_key
+// rather than erroring on a duplicate key. To avoid clobbering data on
+// upsert, every field currently on the session is resent unchanged, with
+// only `frozen` changed.
 const fetch = require('node-fetch');
 
 const SCHED_API_KEY = process.env.SCHED_API_KEY;
@@ -23,7 +32,11 @@ const BASE_URL = `https://${SUBDOMAIN}.sched.com/api`;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function schedApiCall(path, params) {
-    const body = new URLSearchParams({ ...params, api_key: SCHED_API_KEY });
+    const clean = {};
+    for (const [k, v] of Object.entries(params)) {
+        if (v !== undefined && v !== null) clean[k] = v;
+    }
+    const body = new URLSearchParams({ ...clean, api_key: SCHED_API_KEY });
     const response = await fetch(`${BASE_URL}/${path}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -33,10 +46,12 @@ async function schedApiCall(path, params) {
     if (!response.ok) {
         throw new Error(`${path} failed (${response.status}): ${text}`);
     }
+    // Some endpoints (session/add, session/mod) return plain text like "Ok"
+    // on success rather than JSON - only session/export is guaranteed JSON.
     try {
         return JSON.parse(text);
     } catch {
-        throw new Error(`${path} returned non-JSON: ${text}`);
+        return text;
     }
 }
 
@@ -83,9 +98,9 @@ function sessionMatchesDate(session, dateStr) {
     );
 }
 
-// The exact field names returned by session/export aren't documented and may
-// not match the 'session_key'/'session_start'/'frozen' names used as input to
-// session/add - resolve by exact name first, then case-insensitively.
+// The exact field names returned by session/export aren't documented and
+// don't all match the names session/add expects as input - resolve by exact
+// name first, then case-insensitively.
 function getField(session, ...candidates) {
     for (const c of candidates) {
         if (session[c] !== undefined) return session[c];
@@ -99,20 +114,46 @@ function getField(session, ...candidates) {
     return undefined;
 }
 
-// 'id' is Sched's internal opaque hash and is NOT accepted by session/mod.
-// The real session_key (the value originally passed to session/add) comes
-// back as 'event_key' in session/export - confirmed against a live sample
-// where event_key ("260829_irozmn") matched this app's addSlot key format
-// exactly, while id was an unrelated 32-char internal hash.
+// 'id' is Sched's internal opaque hash and is NOT the session_key. The real
+// session_key (the value originally passed to session/add) comes back as
+// 'event_key' in session/export - confirmed against a live sample where
+// event_key ("260829_irozmn") matched this app's addSlot key format exactly,
+// while id was an unrelated 32-char internal hash.
 const getKey = (s) => getField(s, 'session_key', 'event_key', 'key', 'session_id');
 const getFrozen = (s) => getField(s, 'frozen');
-const getStart = (s) => getField(s, 'session_start', 'start', 'event_start', 'session_date', 'date');
+const getName = (s) => getField(s, 'name');
+const getStart = (s) => getField(s, 'session_start', 'event_start', 'start', 'session_date', 'date');
+const getEnd = (s) => getField(s, 'session_end', 'event_end', 'end');
+const getType = (s) => getField(s, 'session_type', 'event_type');
+const getSubtype = (s) => getField(s, 'session_subtype', 'event_subtype');
+const getVenue = (s) => getField(s, 'venue');
+const getSeats = (s) => getField(s, 'seats');
+const getDescription = (s) => getField(s, 'description');
+const getActive = (s) => getField(s, 'active');
 
 function selectTargets(allSessions) {
     if (SESSION_KEY) {
         return allSessions.filter((s) => getKey(s) === SESSION_KEY);
     }
     return allSessions.filter((s) => sessionMatchesDate(s, TARGET_DATE));
+}
+
+// Resend every field currently on the session (as understood from export)
+// so the session/add upsert doesn't clobber anything - only frozen changes.
+function buildUpsertParams(s) {
+    return {
+        session_key: getKey(s),
+        name: getName(s),
+        session_start: getStart(s),
+        session_end: getEnd(s),
+        session_type: getType(s),
+        session_subtype: getSubtype(s),
+        venue: getVenue(s),
+        seats: getSeats(s),
+        description: getDescription(s),
+        active: getActive(s),
+        frozen: FREEZE_VALUE
+    };
 }
 
 async function main() {
@@ -122,7 +163,8 @@ async function main() {
 
     console.log(`Fetching sessions from ${BASE_URL} ...`);
     const allSessions = await fetchAllSessions();
-    console.log(`Fetched ${allSessions.length} total sessions.`);
+    const initialCount = allSessions.length;
+    console.log(`Fetched ${initialCount} total sessions.`);
 
     const targets = selectTargets(allSessions);
     console.log(SESSION_KEY
@@ -152,7 +194,7 @@ async function main() {
     }
 
     if (DRY_RUN) {
-        console.log('\n[DRY RUN] Would set frozen=%s on:', FREEZE_VALUE);
+        console.log('\n[DRY RUN] Would upsert via session/add to set frozen=%s on:', FREEZE_VALUE);
         for (const s of toChange) {
             console.log(`  - ${getKey(s)}  ${s.name}  (${getStart(s)})`);
         }
@@ -163,19 +205,23 @@ async function main() {
     for (const s of toChange) {
         const key = getKey(s);
         try {
-            await schedApiCall('session/mod', { session_key: key, frozen: FREEZE_VALUE });
+            const response = await schedApiCall('session/add', buildUpsertParams(s));
             results.push({ session_key: key, name: s.name, ok: true });
-            console.log(`✓ mod sent: ${key}  ${s.name}`);
+            console.log(`✓ upsert sent: ${key}  ${s.name}  (response: ${JSON.stringify(response)})`);
         } catch (error) {
             results.push({ session_key: key, name: s.name, ok: false, error: error.message });
-            console.log(`✗ mod failed: ${key}  ${s.name} - ${error.message}`);
+            console.log(`✗ upsert failed: ${key}  ${s.name} - ${error.message}`);
         }
         await sleep(500);
     }
 
-    console.log('\nVerifying changes actually persisted (frozen is undocumented for session/mod)...');
+    console.log('\nVerifying changes actually persisted...');
     const verifySessions = await fetchAllSessions();
     const verifyByKey = new Map(verifySessions.map((s) => [getKey(s), s]));
+
+    if (verifySessions.length !== initialCount) {
+        console.log(`\n🚨 CRITICAL: session count changed from ${initialCount} to ${verifySessions.length} - session/add may have created duplicates instead of updating in place. Investigate before trusting this run.`);
+    }
 
     let failures = 0;
     for (const r of results) {
@@ -190,7 +236,7 @@ async function main() {
     }
 
     console.log(`\nDone. ${results.length - failures}/${results.length} verified as frozen='${FREEZE_VALUE}'.`);
-    if (failures > 0) {
+    if (failures > 0 || verifySessions.length !== initialCount) {
         process.exitCode = 1;
     }
 }
