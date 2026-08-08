@@ -2,9 +2,11 @@ name: Freeze August 29 Shifts
 
 on:
   schedule:
-    # 02:00 UTC Aug 8 = 9:00 PM CDT Aug 7, 2026 (one-time; guarded below against
-    # firing on this same cron in future years, since GitHub cron has no year field).
-    - cron: '0 2 8 8 *'
+    # TEMPORARY close-range test cron: 02:15 UTC Aug 8, 2026, to positively
+    # confirm the schedule trigger actually fires (prior 8:30/9:00 PM windows
+    # left no evidence either way of firing vs. not being live on main yet).
+    # Revert to the real target time once confirmed.
+    - cron: '15 2 8 8 *'
   workflow_dispatch:
     inputs:
       dry_run:
