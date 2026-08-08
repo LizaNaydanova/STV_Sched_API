@@ -99,7 +99,12 @@ function getField(session, ...candidates) {
     return undefined;
 }
 
-const getKey = (s) => getField(s, 'session_key', 'key', 'id', 'session_id');
+// 'id' is Sched's internal opaque hash and is NOT accepted by session/mod.
+// The real session_key (the value originally passed to session/add) comes
+// back as 'event_key' in session/export - confirmed against a live sample
+// where event_key ("260829_irozmn") matched this app's addSlot key format
+// exactly, while id was an unrelated 32-char internal hash.
+const getKey = (s) => getField(s, 'session_key', 'event_key', 'key', 'session_id');
 const getFrozen = (s) => getField(s, 'frozen');
 const getStart = (s) => getField(s, 'session_start', 'start', 'event_start', 'session_date', 'date');
 
