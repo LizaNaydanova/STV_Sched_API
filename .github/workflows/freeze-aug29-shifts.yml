@@ -10,7 +10,7 @@ on:
       dry_run:
         description: 'Preview only, no changes'
         type: boolean
-        default: true
+        default: false
       target_date:
         description: 'Date to freeze (YYYY-MM-DD)'
         type: string
