@@ -2,11 +2,14 @@ name: Freeze August 29 Shifts
 
 on:
   schedule:
-    # TEMPORARY close-range test cron: 02:15 UTC Aug 8, 2026, to positively
-    # confirm the schedule trigger actually fires (prior 8:30/9:00 PM windows
-    # left no evidence either way of firing vs. not being live on main yet).
-    # Revert to the real target time once confirmed.
-    - cron: '15 2 8 8 *'
+    # TEMPORARY: every 5 minutes, so GitHub gets many chances to actually
+    # dispatch the event instead of one single exact minute (single-minute
+    # crons gave 3 windows - 8:30/9:00/9:15 PM CT - zero visible fires,
+    # consistent with GitHub silently skipping an exact-minute schedule
+    # under load with no retry). The run-window guard below keeps this from
+    # actually doing anything outside a short bounded window. Revert once
+    # a schedule-triggered run is confirmed in the Actions tab.
+    - cron: '*/5 * * * *'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -54,8 +57,13 @@ jobs:
           FREEZE_VALUE: ${{ github.event_name == 'workflow_dispatch' && inputs.freeze_value || 'Y' }}
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
         run: |
-          if [ "${{ github.event_name }}" = "schedule" ] && [ "$(date -u +%F)" != "2026-08-08" ]; then
-            echo "Not the intended one-time scheduled run date (2026-08-08 UTC); skipping to avoid an unintended annual re-run."
-            exit 0
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            NOW_EPOCH=$(date -u +%s)
+            START_EPOCH=$(date -u -d '2026-08-08T02:15:00Z' +%s)
+            END_EPOCH=$(date -u -d '2026-08-08T03:00:00Z' +%s)
+            if [ "$NOW_EPOCH" -lt "$START_EPOCH" ] || [ "$NOW_EPOCH" -gt "$END_EPOCH" ]; then
+              echo "Outside the intended one-time run window (2026-08-08 02:15-03:00 UTC); skipping so the every-5-min cron doesn't run all day."
+              exit 0
+            fi
           fi
           node scripts/freeze-shifts.js
