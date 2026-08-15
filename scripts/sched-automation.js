@@ -19,17 +19,17 @@ const DRY_RUN = process.env.DRY_RUN === 'true';
 // 2026-08-08T20:00:00-05:00
 const NOW_OVERRIDE = process.env.NOW_OVERRIDE || '';
 
-// Email settings.
-// Email is optional. If these are not configured, the automation still runs,
-// but it logs the leadership warning instead of sending it.
+// Email settings
 const SMTP_HOST = process.env.SMTP_HOST || '';
 const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
 const SMTP_USER = process.env.SMTP_USER || '';
 const SMTP_PASS = process.env.SMTP_PASS || '';
 const EMAIL_FROM = process.env.EMAIL_FROM || '';
-const ALERT_EMAIL = process.env.ALERT_EMAIL || 'stvpolicies@utmb.edu';
+const ALERT_EMAIL =
+    process.env.ALERT_EMAIL || 'stvpolicies@utmb.edu';
 
-const BASE_URL = `https://${SUBDOMAIN}.sched.com/api`;
+const BASE_URL =
+    `https://${SUBDOMAIN}.sched.com/api`;
 
 const sleep = (ms) =>
     new Promise((resolve) => setTimeout(resolve, ms));
@@ -40,9 +40,10 @@ const sleep = (ms) =>
 
 function getNow() {
     if (NOW_OVERRIDE) {
-        const overridden = DateTime.fromISO(NOW_OVERRIDE, {
-            setZone: true
-        }).setZone(TIME_ZONE);
+        const overridden =
+            DateTime.fromISO(NOW_OVERRIDE, {
+                setZone: true
+            }).setZone(TIME_ZONE);
 
         if (!overridden.isValid) {
             throw new Error(
@@ -56,14 +57,6 @@ function getNow() {
     return DateTime.now().setZone(TIME_ZONE);
 }
 
-/**
- * Parse the date/time returned by Sched.
- *
- * Handles common formats such as:
- * 2026-08-15 10:00
- * 2026-08-15 10:00:00
- * 2026-08-15T10:00:00
- */
 function parseSchedDateTime(value) {
     if (!value || typeof value !== 'string') {
         return null;
@@ -77,22 +70,27 @@ function parseSchedDateTime(value) {
     ];
 
     for (const format of formats) {
-        const parsed = DateTime.fromFormat(
-            value.trim(),
-            format,
-            {
-                zone: TIME_ZONE
-            }
-        );
+        const parsed =
+            DateTime.fromFormat(
+                value.trim(),
+                format,
+                {
+                    zone: TIME_ZONE
+                }
+            );
 
         if (parsed.isValid) {
             return parsed;
         }
     }
 
-    const iso = DateTime.fromISO(value.trim(), {
-        zone: TIME_ZONE
-    });
+    const iso =
+        DateTime.fromISO(
+            value.trim(),
+            {
+                zone: TIME_ZONE
+            }
+        );
 
     if (iso.isValid) {
         return iso.setZone(TIME_ZONE);
@@ -105,10 +103,16 @@ function parseSchedDateTime(value) {
 // SCHED API
 // ============================================================================
 
-async function schedApiCall(path, params = {}) {
+async function schedApiCall(
+    path,
+    params = {}
+) {
     const clean = {};
 
-    for (const [key, value] of Object.entries(params)) {
+    for (
+        const [key, value]
+        of Object.entries(params)
+    ) {
         if (
             value !== undefined &&
             value !== null &&
@@ -118,26 +122,29 @@ async function schedApiCall(path, params = {}) {
         }
     }
 
-    const body = new URLSearchParams({
-        ...clean,
-        api_key: SCHED_API_KEY
-    });
+    const body =
+        new URLSearchParams({
+            ...clean,
+            api_key: SCHED_API_KEY
+        });
 
-    const response = await fetch(
-        `${BASE_URL}/${path}`,
-        {
-            method: 'POST',
-            headers: {
-                'Content-Type':
-                    'application/x-www-form-urlencoded',
-                'User-Agent':
-                    'STV-Sched-Automation/1.0'
-            },
-            body: body.toString()
-        }
-    );
+    const response =
+        await fetch(
+            `${BASE_URL}/${path}`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type':
+                        'application/x-www-form-urlencoded',
+                    'User-Agent':
+                        'STV-Sched-Automation/1.0'
+                },
+                body: body.toString()
+            }
+        );
 
-    const text = await response.text();
+    const text =
+        await response.text();
 
     if (!response.ok) {
         throw new Error(
@@ -159,15 +166,16 @@ async function fetchAllSessions() {
     let page = 1;
 
     for (;;) {
-        const batch = await schedApiCall(
-            'session/export',
-            {
-                format: 'json',
-                custom_data: 'Y',
-                page: String(page),
-                limit: String(limit)
-            }
-        );
+        const batch =
+            await schedApiCall(
+                'session/export',
+                {
+                    format: 'json',
+                    custom_data: 'Y',
+                    page: String(page),
+                    limit: String(limit)
+                }
+            );
 
         if (
             !Array.isArray(batch) ||
@@ -192,22 +200,32 @@ async function fetchAllSessions() {
 // FIELD HELPERS
 // ============================================================================
 
-function getField(session, ...candidates) {
+function getField(
+    session,
+    ...candidates
+) {
     for (const candidate of candidates) {
-        if (session[candidate] !== undefined) {
+        if (
+            session[candidate] !== undefined
+        ) {
             return session[candidate];
         }
     }
 
     const lowerMap = {};
 
-    for (const key of Object.keys(session)) {
+    for (
+        const key
+        of Object.keys(session)
+    ) {
         lowerMap[key.toLowerCase()] = key;
     }
 
     for (const candidate of candidates) {
         const realKey =
-            lowerMap[candidate.toLowerCase()];
+            lowerMap[
+                candidate.toLowerCase()
+            ];
 
         if (
             realKey !== undefined &&
@@ -259,30 +277,37 @@ function getStart(session) {
 }
 
 function getType(session) {
-    const raw = getField(
-        session,
-        'session_type',
-        'event_type',
-        'type'
-    );
+    const raw =
+        getField(
+            session,
+            'session_type',
+            'event_type',
+            'type'
+        );
 
     if (raw) {
-        const type = String(raw).toLowerCase();
+        const type =
+            String(raw).toLowerCase();
 
-        if (type.includes('leadership')) {
+        if (
+            type.includes('leadership')
+        ) {
             return 'Leadership';
         }
 
-        if (type.includes('general')) {
+        if (
+            type.includes('general')
+        ) {
             return 'General';
         }
     }
 
-    // Safety fallback based on the naming convention
-    // used by your current slot generator.
-    const name = getName(session).toLowerCase();
+    const name =
+        getName(session).toLowerCase();
 
-    if (name.includes('leadership')) {
+    if (
+        name.includes('leadership')
+    ) {
         return 'Leadership';
     }
 
@@ -290,17 +315,20 @@ function getType(session) {
 }
 
 function getRequiredSeats(session) {
-    const raw = getField(
-        session,
-        'seats',
-        'event_seats',
-        'session_seats',
-        'capacity'
-    );
+    const raw =
+        getField(
+            session,
+            'seats',
+            'event_seats',
+            'session_seats',
+            'capacity'
+        );
 
     const seats = Number(raw);
 
-    if (!Number.isFinite(seats)) {
+    if (
+        !Number.isFinite(seats)
+    ) {
         return null;
     }
 
@@ -314,27 +342,36 @@ function getFrozen(session) {
     );
 }
 
+function isShadowingSession(session) {
+    return getName(session)
+        .toLowerCase()
+        .includes('shadowing');
+}
+
 // ============================================================================
-// ATTENDANCE
+// ATTENDANCE / COVERAGE
 // ============================================================================
 
-async function getAttendanceCount(session) {
+async function getAttendanceCount(
+    session
+) {
     const key = getKey(session);
 
     if (!key) {
         throw new Error(
-            `Cannot retrieve attendance: session has no key`
+            'Cannot retrieve attendance: session has no key'
         );
     }
 
-    const response = await schedApiCall(
-        'session/seats',
-        {
-            key,
-            type: 'attendance',
-            format: 'json'
-        }
-    );
+    const response =
+        await schedApiCall(
+            'session/seats',
+            {
+                key,
+                type: 'attendance',
+                format: 'json'
+            }
+        );
 
     if (!Array.isArray(response)) {
         throw new Error(
@@ -347,14 +384,15 @@ async function getAttendanceCount(session) {
 }
 
 async function getCoverage(session) {
-    const required = getRequiredSeats(session);
+    const required =
+        getRequiredSeats(session);
 
     if (
         required === null ||
         required < 1
     ) {
         throw new Error(
-            `Could not determine required seats`
+            'Could not determine required seats'
         );
     }
 
@@ -364,11 +402,13 @@ async function getCoverage(session) {
     return {
         required,
         registered,
-        full: registered >= required,
-        missing: Math.max(
-            required - registered,
-            0
-        )
+        full:
+            registered >= required,
+        missing:
+            Math.max(
+                required - registered,
+                0
+            )
     };
 }
 
@@ -388,12 +428,19 @@ async function setFrozen(
     desiredValue,
     reason
 ) {
-    const key = getKey(session);
-    const name = getName(session);
-    const current = getFrozen(session);
+    const key =
+        getKey(session);
+
+    const name =
+        getName(session);
+
+    const current =
+        getFrozen(session);
 
     console.log(
-        `${desiredValue === 'Y' ? 'FREEZE' : 'UNFREEZE'}: ` +
+        `${desiredValue === 'Y'
+            ? 'FREEZE'
+            : 'UNFREEZE'}: ` +
         `${name} | ${key} | ${reason}`
     );
 
@@ -416,15 +463,18 @@ async function setFrozen(
         return true;
     }
 
-    const response = await schedApiCall(
-        'event/mod',
-        {
-            session_key: key,
-            frozen: desiredValue
-        }
-    );
+    const response =
+        await schedApiCall(
+            'event/mod',
+            {
+                session_key: key,
+                frozen: desiredValue
+            }
+        );
 
-    if (isErrorResponse(response)) {
+    if (
+        isErrorResponse(response)
+    ) {
         console.log(
             `  ✗ Sched rejected update: ${response}`
         );
@@ -433,7 +483,7 @@ async function setFrozen(
     }
 
     console.log(
-        `  ✓ event/mod sent successfully`
+        '  ✓ event/mod sent successfully'
     );
 
     await sleep(500);
@@ -449,14 +499,16 @@ function isInNextCalendarMonth(
     session,
     now
 ) {
-    const start = getStart(session);
+    const start =
+        getStart(session);
 
     if (!start) {
         return false;
     }
 
     const nextMonth =
-        now.plus({ months: 1 }).startOf('month');
+        now.plus({ months: 1 })
+            .startOf('month');
 
     return (
         start.year === nextMonth.year &&
@@ -468,8 +520,7 @@ async function handleMonthlyOpening(
     sessions,
     now
 ) {
-    // Only run this rule on the 21st during
-    // the 8 PM Central hour.
+    // Only on the 21st during the 8 PM Central hour
     if (
         now.day !== 21 ||
         now.hour !== 20
@@ -491,36 +542,41 @@ async function handleMonthlyOpening(
         '=================================================='
     );
 
-    const targets = sessions.filter(
-        (session) =>
-            isInNextCalendarMonth(
-                session,
-                now
-            )
-    );
+    const targets =
+        sessions.filter(
+            (session) =>
+                isInNextCalendarMonth(
+                    session,
+                    now
+                )
+        );
 
     console.log(
         `Found ${targets.length} session(s) in next month.`
     );
 
-    for (const session of targets) {
-        const start = getStart(session);
+    for (
+        const session
+        of targets
+    ) {
+        const start =
+            getStart(session);
 
         if (!start) {
             console.log(
                 `Skipping ${getName(session)}: could not parse date.`
             );
-
             continue;
         }
 
         const hoursAway =
-            start.diff(now, 'hours').hours;
+            start.diff(
+                now,
+                'hours'
+            ).hours;
 
-        // Deadline rules take priority.
-        //
-        // Leadership inside 7 days should not
-        // be reopened by this rule.
+        // Do not let monthly opening override
+        // leadership/general deadline rules.
         if (
             getType(session) === 'Leadership' &&
             hoursAway <= 168
@@ -529,12 +585,9 @@ async function handleMonthlyOpening(
                 `Skipping leadership session inside 7-day deadline: ` +
                 getName(session)
             );
-
             continue;
         }
 
-        // General session inside 48 hours should
-        // not be reopened by monthly rule.
         if (
             getType(session) === 'General' &&
             hoursAway <= 48
@@ -543,7 +596,6 @@ async function handleMonthlyOpening(
                 `Skipping general session inside 48-hour deadline: ` +
                 getName(session)
             );
-
             continue;
         }
 
@@ -556,7 +608,7 @@ async function handleMonthlyOpening(
 }
 
 // ============================================================================
-// LEADERSHIP: 7-DAY RULE
+// LEADERSHIP: EXACTLY 7 CALENDAR DAYS BEFORE
 // ============================================================================
 
 async function processLeadership(
@@ -576,30 +628,53 @@ async function processLeadership(
 
     const underfilledForEmail = [];
 
-    for (const session of sessions) {
+    for (
+        const session
+        of sessions
+    ) {
         if (
             getType(session) !== 'Leadership'
         ) {
             continue;
         }
 
-        const start = getStart(session);
+        // Shadowing slots do not count as required leadership coverage.
+        if (
+            isShadowingSession(session)
+        ) {
+            continue;
+        }
+
+        const start =
+            getStart(session);
 
         if (!start) {
             continue;
         }
 
-        const clinicDate = start.startOf('day');
-        const today = now.startOf('day');
+        const clinicDate =
+            start.startOf('day');
 
-        const calendarDaysAway = Math.round(
-            clinicDate.diff(today, 'days').days
-        );
+        const today =
+            now.startOf('day');
 
-// Leadership rule runs only exactly 7 calendar days before clinic.
-if (calendarDaysAway !== 7) {
-    continue;
-}
+        const calendarDaysAway =
+            Math.round(
+                clinicDate
+                    .diff(
+                        today,
+                        'days'
+                    )
+                    .days
+            );
+
+        // Run the leadership rule only exactly
+        // 7 calendar days before the clinic.
+        if (
+            calendarDaysAway !== 7
+        ) {
+            continue;
+        }
 
         let coverage;
 
@@ -622,35 +697,25 @@ if (calendarDaysAway !== 7) {
 
         if (coverage.full) {
             await setFrozen(
-            session,
-            'Y',
-            `Leadership full 7 days before clinic (${coverage.registered}/${coverage.required})`
-        );
+                session,
+                'Y',
+                `Leadership full 7 days before clinic ` +
+                `(${coverage.registered}/${coverage.required})`
+            );
         } else {
             await setFrozen(
-            session,
-            'N',
-            `Leadership underfilled 7 days before clinic (${coverage.registered}/${coverage.required})`
-        );
-    
-        underfilledForEmail.push({
-            session,
-            coverage
-        });
-}
+                session,
+                'N',
+                `Leadership underfilled 7 days before clinic ` +
+                `(${coverage.registered}/${coverage.required})`
+            );
 
-            /*
-             * Send the warning only on the date that
-             * is exactly seven calendar days before
-             * the clinic, during the 8 PM Central hour.
-             *
-             * This prevents an hourly workflow from
-             * emailing every hour for an entire week.
-             */
+            // Only queue the email during the 8 PM hour,
+            // so an hourly workflow does not send repeated alerts.
             if (now.hour === 20) {
                 underfilledForEmail.push({
-                session,
-                coverage
+                    session,
+                    coverage
                 });
             }
         }
@@ -662,14 +727,13 @@ if (calendarDaysAway !== 7) {
         underfilledForEmail.length > 0
     ) {
         await sendLeadershipAlert(
-            underfilledForEmail,
-            now
+            underfilledForEmail
         );
     }
 }
 
 // ============================================================================
-// GENERAL VOLUNTEERS: 48-HOUR RULE
+// GENERAL: WITHIN 48 HOURS
 // ============================================================================
 
 async function processGeneral(
@@ -687,21 +751,28 @@ async function processGeneral(
         '=================================================='
     );
 
-    for (const session of sessions) {
+    for (
+        const session
+        of sessions
+    ) {
         if (
             getType(session) !== 'General'
         ) {
             continue;
         }
 
-        const start = getStart(session);
+        const start =
+            getStart(session);
 
         if (!start) {
             continue;
         }
 
         const hoursAway =
-            start.diff(now, 'hours').hours;
+            start.diff(
+                now,
+                'hours'
+            ).hours;
 
         if (
             hoursAway <= 0 ||
@@ -733,14 +804,15 @@ async function processGeneral(
             await setFrozen(
                 session,
                 'Y',
-                `General shift full within 48 hours (${coverage.registered}/${coverage.required})`
+                `General shift full within 48 hours ` +
+                `(${coverage.registered}/${coverage.required})`
             );
         } else {
-            // Keep underfilled shifts available.
             await setFrozen(
                 session,
                 'N',
-                `General shift underfilled within 48 hours (${coverage.registered}/${coverage.required})`
+                `General shift underfilled within 48 hours ` +
+                `(${coverage.registered}/${coverage.required})`
             );
         }
 
@@ -762,29 +834,37 @@ function emailConfigured() {
 }
 
 async function sendLeadershipAlert(
-    items,
-    now
+    items
 ) {
-    const sorted = [...items].sort(
-        (a, b) =>
-            getStart(a.session).toMillis() -
-            getStart(b.session).toMillis()
-    );
+    const sorted =
+        [...items].sort(
+            (a, b) =>
+                getStart(a.session)
+                    .toMillis() -
+                getStart(b.session)
+                    .toMillis()
+        );
 
     const groupedByDate = {};
 
-    for (const item of sorted) {
+    for (
+        const item
+        of sorted
+    ) {
         const start =
             getStart(item.session);
 
         const dateKey =
             start.toISODate();
 
-        if (!groupedByDate[dateKey]) {
+        if (
+            !groupedByDate[dateKey]
+        ) {
             groupedByDate[dateKey] = [];
         }
 
-        groupedByDate[dateKey].push(item);
+        groupedByDate[dateKey]
+            .push(item);
     }
 
     let text = '';
@@ -797,15 +877,22 @@ async function sendLeadershipAlert(
         of Object.entries(groupedByDate)
     ) {
         const formattedDate =
-            DateTime.fromISO(date, {
-                zone: TIME_ZONE
-            }).toFormat(
+            DateTime.fromISO(
+                date,
+                {
+                    zone: TIME_ZONE
+                }
+            ).toFormat(
                 'cccc, LLLL d, yyyy'
             );
 
-        text += `${formattedDate}\n`;
+        text +=
+            `${formattedDate}\n`;
 
-        for (const item of dateItems) {
+        for (
+            const item
+            of dateItems
+        ) {
             const {
                 session,
                 coverage
@@ -825,7 +912,13 @@ async function sendLeadershipAlert(
 
     console.log('');
     console.log(
+        '=================================================='
+    );
+    console.log(
         'LEADERSHIP COVERAGE EMAIL'
+    );
+    console.log(
+        '=================================================='
     );
     console.log(text);
 
@@ -833,7 +926,6 @@ async function sendLeadershipAlert(
         console.log(
             `[DRY RUN] Would email ${ALERT_EMAIL}.`
         );
-
         return;
     }
 
@@ -853,7 +945,8 @@ async function sendLeadershipAlert(
         nodemailer.createTransport({
             host: SMTP_HOST,
             port: SMTP_PORT,
-            secure: SMTP_PORT === 465,
+            secure:
+                SMTP_PORT === 465,
             auth: {
                 user: SMTP_USER,
                 pass: SMTP_PASS
@@ -884,14 +977,17 @@ async function main() {
         );
     }
 
-    const now = getNow();
+    const now =
+        getNow();
 
     console.log(
-        `Sched automation starting...`
+        'Sched automation starting...'
     );
 
     console.log(
-        `Mode: ${DRY_RUN ? 'DRY RUN' : 'LIVE'}`
+        `Mode: ${DRY_RUN
+            ? 'DRY RUN'
+            : 'LIVE'}`
     );
 
     console.log(
@@ -919,12 +1015,6 @@ async function main() {
         `Fetched ${sessions.length} total sessions.`
     );
 
-    /*
-     * Run monthly opening first.
-     *
-     * Deadline checks follow it and therefore
-     * take priority over the monthly opening.
-     */
     await handleMonthlyOpening(
         sessions,
         now
