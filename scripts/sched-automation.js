@@ -589,17 +589,17 @@ async function processLeadership(
             continue;
         }
 
-        const hoursAway =
-            start.diff(now, 'hours').hours;
+        const clinicDate = start.startOf('day');
+        const today = now.startOf('day');
 
-        // Ignore past sessions and anything
-        // more than one week away.
-        if (
-            hoursAway <= 0 ||
-            hoursAway > 168
-        ) {
-            continue;
-        }
+        const calendarDaysAway = Math.round(
+            clinicDate.diff(today, 'days').days
+        );
+
+// Leadership rule runs only exactly 7 calendar days before clinic.
+if (calendarDaysAway !== 7) {
+    continue;
+}
 
         let coverage;
 
@@ -622,18 +622,22 @@ async function processLeadership(
 
         if (coverage.full) {
             await setFrozen(
-                session,
-                'Y',
-                `Leadership full within 7 days (${coverage.registered}/${coverage.required})`
-            );
+            session,
+            'Y',
+            `Leadership full 7 days before clinic (${coverage.registered}/${coverage.required})`
+        );
         } else {
-            // Explicitly leave/reopen it so
-            // volunteers can still register.
             await setFrozen(
-                session,
-                'N',
-                `Leadership underfilled (${coverage.registered}/${coverage.required})`
-            );
+            session,
+            'N',
+            `Leadership underfilled 7 days before clinic (${coverage.registered}/${coverage.required})`
+        );
+    
+        underfilledForEmail.push({
+            session,
+            coverage
+        });
+}
 
             /*
              * Send the warning only on the date that
@@ -643,29 +647,10 @@ async function processLeadership(
              * This prevents an hourly workflow from
              * emailing every hour for an entire week.
              */
-            const clinicDate =
-                start.startOf('day');
-
-            const today =
-                now.startOf('day');
-
-            const calendarDaysAway =
-                Math.round(
-                    clinicDate
-                        .diff(
-                            today,
-                            'days'
-                        )
-                        .days
-                );
-
-            if (
-                calendarDaysAway === 7 &&
-                now.hour === 20
-            ) {
+            if (now.hour === 20) {
                 underfilledForEmail.push({
-                    session,
-                    coverage
+                session,
+                coverage
                 });
             }
         }
