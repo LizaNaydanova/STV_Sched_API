@@ -1,0 +1,70 @@
+name: Sched Shift Automation
+
+on:
+  schedule:
+    # Run once each hour.
+    #
+    # The JavaScript itself uses America/Chicago,
+    # so daylight saving time does not require us
+    # to change the cron.
+    #
+    # GitHub cron uses UTC.
+    - cron: '17 * * * *'
+
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Practice only — do not change Sched or send email'
+        required: true
+        type: boolean
+        default: true
+
+      simulated_now:
+        description: 'Optional simulated date/time, e.g. 2026-08-08T20:00:00-05:00'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  sched-automation:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          npm install
+          npm install luxon nodemailer
+
+      - name: Run Sched automation
+        env:
+          SCHED_API_KEY: ${{ secrets.SCHED_API_KEY }}
+          SCHED_SUBDOMAIN: stvincentsclinic2025
+
+          TIME_ZONE: America/Chicago
+
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+
+          NOW_OVERRIDE: ${{ github.event_name == 'workflow_dispatch' && inputs.simulated_now || '' }}
+
+          ALERT_EMAIL: stvpolicies@utmb.edu
+
+          # These email settings are optional.
+          # The rest of the Sched automation works without them.
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+
+        run: node scripts/sched-automation.js
