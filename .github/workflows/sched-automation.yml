@@ -2,13 +2,12 @@ name: Sched Shift Automation
 
 on:
   schedule:
-    # Run once each hour.
+    # Run hourly.
     #
-    # The JavaScript itself uses America/Chicago,
-    # so daylight saving time does not require us
-    # to change the cron.
+    # GitHub cron is UTC, but the JavaScript converts
+    # everything to America/Chicago.
     #
-    # GitHub cron uses UTC.
+    # Running at minute 17 avoids the top-of-hour rush.
     - cron: '17 * * * *'
 
   workflow_dispatch:
@@ -39,7 +38,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Install dependencies
         run: |
@@ -49,6 +48,7 @@ jobs:
       - name: Run Sched automation
         env:
           SCHED_API_KEY: ${{ secrets.SCHED_API_KEY }}
+
           SCHED_SUBDOMAIN: stvincentsclinic2025
 
           TIME_ZONE: America/Chicago
@@ -59,8 +59,8 @@ jobs:
 
           ALERT_EMAIL: stvpolicies@utmb.edu
 
-          # These email settings are optional.
-          # The rest of the Sched automation works without them.
+          # Optional email configuration.
+          # Sched automation still works without these.
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
