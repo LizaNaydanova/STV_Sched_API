@@ -1,4 +1,4 @@
-#name: Freeze August 29 Shifts
+name: Freeze August 29 Shifts
 
 on:
   schedule:
@@ -9,7 +9,7 @@ on:
     # under load with no retry). The run-window guard below keeps this from
     # actually doing anything outside a short bounded window. Revert once
     # a schedule-triggered run is confirmed in the Actions tab.
-  #  - cron: '*/5 * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch:
     inputs:
       dry_run:
