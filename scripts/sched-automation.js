@@ -19,7 +19,7 @@ const DRY_RUN = process.env.DRY_RUN === 'true';
 // 2026-08-08T20:00:00-05:00
 const NOW_OVERRIDE = process.env.NOW_OVERRIDE || '';
 
-// Email settings
+// Email settings -need to be setup
 const SMTP_HOST = process.env.SMTP_HOST || '';
 const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
 const SMTP_USER = process.env.SMTP_USER || '';
