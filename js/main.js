@@ -7,17 +7,17 @@ let loadedMonthData = null;
 
 // Leadership roles configuration
 const leadershipRoles = [
-    //{ name: "Chair", seats: 1 },
+    { name: "Chair", seats: 1 },
     //{ name: "Chair Shadowing", seats: 1 },
-    //{ name: "Encounter", seats: 1 },
-    { name: "Encounter Shadowing", seats: 1 },
-    //{ name: "Front Desk", seats: 1 },
-    { name: "Front Desk Shadowing", seats: 1 },
-    //{ name: "In Person Support", seats: 1 },
-    { name: "In Person Support Shadowing", seats: 1 },
+    { name: "Encounter", seats: 1 },
+    //{ name: "Encounter Shadowing", seats: 1 },
+    { name: "Front Desk", seats: 1 },
+    //{ name: "Front Desk Shadowing", seats: 1 },
+    { name: "In Person Support", seats: 1 },
+    //{ name: "In Person Support Shadowing", seats: 1 },
     //{ name: "Distance Support", seats: 1 },
-    //{ name: "Pharmacy", seats: 1 },
-    { name: "Pharmacy Shadowing", seats: 1 }
+    { name: "Pharmacy", seats: 1 },
+    //{ name: "Pharmacy Shadowing", seats: 1 }
 ];
 
 // Clinic configurations
@@ -91,7 +91,7 @@ const clinicConfigs = {
         ],
         general: [
             { name: "MS3/MS4/AI", start: "08:45", end: "11:15", seats: 4 },
-            { name: "Nursing", start: "08:45", end: "11:15", seats: 4 }
+            { name: "Nursing", start: "08:45", end: "11:15", seats: 2 }
         ],
         shifts: {
             Experienced: [{ s: "08:45", e: "11:30", c: 2 }, { s: "10:00", e: "12:30", c: 2 }],
