@@ -1,49 +1,107 @@
 const fetch = require('node-fetch');
 const { DateTime } = require('luxon');
 const nodemailer = require('nodemailer');
+const fs = require('fs');
+const path = require('path');
 
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
 
 const SCHED_API_KEY = process.env.SCHED_API_KEY;
-const SUBDOMAIN = process.env.SCHED_SUBDOMAIN || 'stvincentsclinic2025';
 
-const TIME_ZONE = process.env.TIME_ZONE || 'America/Chicago';
+const SUBDOMAIN =
+    process.env.SCHED_SUBDOMAIN ||
+    'stvincentsclinic2025';
 
-// Practice/safety settings
-const DRY_RUN = process.env.DRY_RUN === 'true';
+const TIME_ZONE =
+    process.env.TIME_ZONE ||
+    'America/Chicago';
 
-// Optional simulated current time.
+// --------------------------------------------------------------------------
+// SAFETY
+// --------------------------------------------------------------------------
+
+// true  = practice only
+// false = make real changes + send real emails
+const DRY_RUN =
+    process.env.DRY_RUN === 'true';
+
+// Optional simulated current time for testing.
+//
 // Example:
-// 2026-08-08T20:00:00-05:00
-const NOW_OVERRIDE = process.env.NOW_OVERRIDE || '';
+// 2026-08-21T09:00:00-05:00
+//
+// Leave blank during normal operation.
+const NOW_OVERRIDE =
+    process.env.NOW_OVERRIDE || '';
 
-// Email settings -need to be setup
-const SMTP_HOST = process.env.SMTP_HOST || '';
-const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
-const SMTP_USER = process.env.SMTP_USER || '';
-const SMTP_PASS = process.env.SMTP_PASS || '';
-const EMAIL_FROM = process.env.EMAIL_FROM || '';
+// --------------------------------------------------------------------------
+// EMAIL
+// --------------------------------------------------------------------------
+
+const SMTP_HOST =
+    process.env.SMTP_HOST || '';
+
+const SMTP_PORT =
+    Number(
+        process.env.SMTP_PORT || 587
+    );
+
+const SMTP_USER =
+    process.env.SMTP_USER || '';
+
+const SMTP_PASS =
+    process.env.SMTP_PASS || '';
+
+const EMAIL_FROM =
+    process.env.EMAIL_FROM || '';
+
 const ALERT_EMAIL =
-    process.env.ALERT_EMAIL
+    process.env.ALERT_EMAIL || '';
+
+// Earliest time an underfilled leadership email may be sent.
+//
+// This means:
+// 7:45 AM → wait
+// 8:37 AM → may send
+// 10:00 AM → may send if it has not already been sent
+const LEADERSHIP_EMAIL_START_HOUR =
+    Number(
+        process.env.LEADERSHIP_EMAIL_START_HOUR ||
+        8
+    );
+
+// GitHub Actions cache restores this directory between runs.
+const EMAIL_STATE_DIR =
+    process.env.EMAIL_STATE_DIR ||
+    '.automation-state';
+
+// --------------------------------------------------------------------------
+// SCHED
+// --------------------------------------------------------------------------
 
 const BASE_URL =
     `https://${SUBDOMAIN}.sched.com/api`;
 
 const sleep = (ms) =>
-    new Promise((resolve) => setTimeout(resolve, ms));
+    new Promise(
+        (resolve) => setTimeout(resolve, ms)
+    );
 
 // ============================================================================
-// DATE/TIME
+// DATE / TIME
 // ============================================================================
 
 function getNow() {
     if (NOW_OVERRIDE) {
         const overridden =
-            DateTime.fromISO(NOW_OVERRIDE, {
-                setZone: true
-            }).setZone(TIME_ZONE);
+            DateTime.fromISO(
+                NOW_OVERRIDE,
+                {
+                    setZone: true
+                }
+            ).setZone(TIME_ZONE);
 
         if (!overridden.isValid) {
             throw new Error(
@@ -54,11 +112,15 @@ function getNow() {
         return overridden;
     }
 
-    return DateTime.now().setZone(TIME_ZONE);
+    return DateTime.now()
+        .setZone(TIME_ZONE);
 }
 
 function parseSchedDateTime(value) {
-    if (!value || typeof value !== 'string') {
+    if (
+        !value ||
+        typeof value !== 'string'
+    ) {
         return null;
     }
 
@@ -104,7 +166,7 @@ function parseSchedDateTime(value) {
 // ============================================================================
 
 async function schedApiCall(
-    path,
+    apiPath,
     params = {}
 ) {
     const clean = {};
@@ -130,16 +192,20 @@ async function schedApiCall(
 
     const response =
         await fetch(
-            `${BASE_URL}/${path}`,
+            `${BASE_URL}/${apiPath}`,
             {
                 method: 'POST',
+
                 headers: {
                     'Content-Type':
                         'application/x-www-form-urlencoded',
+
                     'User-Agent':
                         'STV-Sched-Automation/1.0'
                 },
-                body: body.toString()
+
+                body:
+                    body.toString()
             }
         );
 
@@ -148,7 +214,8 @@ async function schedApiCall(
 
     if (!response.ok) {
         throw new Error(
-            `${path} failed (${response.status}): ${text}`
+            `${apiPath} failed ` +
+            `(${response.status}): ${text}`
         );
     }
 
@@ -163,6 +230,7 @@ async function fetchAllSessions() {
     const sessions = [];
 
     const limit = 1000;
+
     let page = 1;
 
     for (;;) {
@@ -186,7 +254,9 @@ async function fetchAllSessions() {
 
         sessions.push(...batch);
 
-        if (batch.length < limit) {
+        if (
+            batch.length < limit
+        ) {
             break;
         }
 
@@ -204,9 +274,13 @@ function getField(
     session,
     ...candidates
 ) {
-    for (const candidate of candidates) {
+    for (
+        const candidate
+        of candidates
+    ) {
         if (
-            session[candidate] !== undefined
+            session[candidate] !==
+            undefined
         ) {
             return session[candidate];
         }
@@ -218,10 +292,15 @@ function getField(
         const key
         of Object.keys(session)
     ) {
-        lowerMap[key.toLowerCase()] = key;
+        lowerMap[
+            key.toLowerCase()
+        ] = key;
     }
 
-    for (const candidate of candidates) {
+    for (
+        const candidate
+        of candidates
+    ) {
         const realKey =
             lowerMap[
                 candidate.toLowerCase()
@@ -229,7 +308,8 @@ function getField(
 
         if (
             realKey !== undefined &&
-            session[realKey] !== undefined
+            session[realKey] !==
+                undefined
         ) {
             return session[realKey];
         }
@@ -255,7 +335,8 @@ function getName(session) {
             'name',
             'event_name',
             'session_name'
-        ) || 'Unnamed session'
+        ) ||
+        'Unnamed session'
     );
 }
 
@@ -276,6 +357,10 @@ function getStart(session) {
     );
 }
 
+// ============================================================================
+// SESSION TYPE
+// ============================================================================
+
 function getType(session) {
     const raw =
         getField(
@@ -287,11 +372,18 @@ function getType(session) {
 
     if (raw) {
         const type =
-            String(raw).toLowerCase();
+            String(raw)
+                .toLowerCase();
 
+        // BOTH Leadership and Shadowing
+        // follow the leadership 7-day rule.
         if (
-            type.includes('leadership') ||
-            type.includes('shadowing')
+            type.includes(
+                'leadership'
+            ) ||
+            type.includes(
+                'shadowing'
+            )
         ) {
             return 'Leadership';
         }
@@ -303,12 +395,19 @@ function getType(session) {
         }
     }
 
+    // Fallback:
+    // also look at the session name.
     const name =
-        getName(session).toLowerCase();
+        getName(session)
+            .toLowerCase();
 
     if (
-        name.includes('leadership') ||
-        name.includes('shadowing')
+        name.includes(
+            'leadership'
+        ) ||
+        name.includes(
+            'shadowing'
+        )
     ) {
         return 'Leadership';
     }
@@ -326,7 +425,8 @@ function getRequiredSeats(session) {
             'capacity'
         );
 
-    const seats = Number(raw);
+    const seats =
+        Number(raw);
 
     if (
         !Number.isFinite(seats)
@@ -344,12 +444,6 @@ function getFrozen(session) {
     );
 }
 
-function isShadowingSession(session) {
-    return getName(session)
-        .toLowerCase()
-        .includes('shadowing');
-}
-
 // ============================================================================
 // ATTENDANCE / COVERAGE
 // ============================================================================
@@ -357,11 +451,13 @@ function isShadowingSession(session) {
 async function getAttendanceCount(
     session
 ) {
-    const key = getKey(session);
+    const key =
+        getKey(session);
 
     if (!key) {
         throw new Error(
-            'Cannot retrieve attendance: session has no key'
+            'Cannot retrieve attendance: ' +
+            'session has no key'
         );
     }
 
@@ -375,9 +471,12 @@ async function getAttendanceCount(
             }
         );
 
-    if (!Array.isArray(response)) {
+    if (
+        !Array.isArray(response)
+    ) {
         throw new Error(
-            `Unexpected session/seats response for ${key}: ` +
+            `Unexpected session/seats ` +
+            `response for ${key}: ` +
             JSON.stringify(response)
         );
     }
@@ -385,7 +484,9 @@ async function getAttendanceCount(
     return response.length;
 }
 
-async function getCoverage(session) {
+async function getCoverage(
+    session
+) {
     const required =
         getRequiredSeats(session);
 
@@ -394,21 +495,27 @@ async function getCoverage(session) {
         required < 1
     ) {
         throw new Error(
-            'Could not determine required seats'
+            'Could not determine ' +
+            'required seats'
         );
     }
 
     const registered =
-        await getAttendanceCount(session);
+        await getAttendanceCount(
+            session
+        );
 
     return {
         required,
         registered,
+
         full:
             registered >= required,
+
         missing:
             Math.max(
-                required - registered,
+                required -
+                    registered,
                 0
             )
     };
@@ -418,10 +525,15 @@ async function getCoverage(session) {
 // FREEZE / UNFREEZE
 // ============================================================================
 
-function isErrorResponse(response) {
+function isErrorResponse(
+    response
+) {
     return (
-        typeof response === 'string' &&
-        /^err/i.test(response.trim())
+        typeof response ===
+            'string' &&
+        /^err/i.test(
+            response.trim()
+        )
     );
 }
 
@@ -440,26 +552,36 @@ async function setFrozen(
         getFrozen(session);
 
     console.log(
-        `${desiredValue === 'Y'
-            ? 'FREEZE'
-            : 'UNFREEZE'}: ` +
-        `${name} | ${key} | ${reason}`
+        `${
+            desiredValue === 'Y'
+                ? 'FREEZE'
+                : 'UNFREEZE'
+        }: ` +
+        `${name} | ` +
+        `${key} | ` +
+        `${reason}`
     );
 
+    // Already in desired state.
     if (
         current !== undefined &&
         current === desiredValue
     ) {
         console.log(
-            `  Already frozen=${desiredValue}; skipping.`
+            `  Already frozen=` +
+            `${desiredValue}; ` +
+            `skipping.`
         );
 
         return true;
     }
 
+    // Practice mode.
     if (DRY_RUN) {
         console.log(
-            `  [DRY RUN] Would set frozen=${desiredValue}`
+            `  [DRY RUN] ` +
+            `Would set frozen=` +
+            `${desiredValue}`
         );
 
         return true;
@@ -469,8 +591,11 @@ async function setFrozen(
         await schedApiCall(
             'event/mod',
             {
-                session_key: key,
-                frozen: desiredValue
+                session_key:
+                    key,
+
+                frozen:
+                    desiredValue
             }
         );
 
@@ -478,7 +603,8 @@ async function setFrozen(
         isErrorResponse(response)
     ) {
         console.log(
-            `  ✗ Sched rejected update: ${response}`
+            `  ✗ Sched rejected ` +
+            `update: ${response}`
         );
 
         return false;
@@ -509,12 +635,17 @@ function isInNextCalendarMonth(
     }
 
     const nextMonth =
-        now.plus({ months: 1 })
-            .startOf('month');
+        now.plus({
+            months: 1
+        }).startOf(
+            'month'
+        );
 
     return (
-        start.year === nextMonth.year &&
-        start.month === nextMonth.month
+        start.year ===
+            nextMonth.year &&
+        start.month ===
+            nextMonth.month
     );
 }
 
@@ -522,7 +653,15 @@ async function handleMonthlyOpening(
     sessions,
     now
 ) {
-    // Only on the 21st during the 8 PM Central hour
+    // Currently:
+    // Open next month's sessions
+    // on the 21st during the
+    // 8 PM Central hour.
+    //
+    // Example:
+    // 8:17 PM → runs
+    // 8:40 PM → runs
+    // 9:05 PM → does not run
     if (
         now.day !== 21 ||
         now.hour !== 20
@@ -531,15 +670,23 @@ async function handleMonthlyOpening(
     }
 
     const nextMonth =
-        now.plus({ months: 1 });
+        now.plus({
+            months: 1
+        });
 
     console.log('');
+
     console.log(
         '=================================================='
     );
+
     console.log(
-        `MONTHLY OPENING: ${nextMonth.toFormat('LLLL yyyy')}`
+        `MONTHLY OPENING: ` +
+        `${nextMonth.toFormat(
+            'LLLL yyyy'
+        )}`
     );
+
     console.log(
         '=================================================='
     );
@@ -554,7 +701,8 @@ async function handleMonthlyOpening(
         );
 
     console.log(
-        `Found ${targets.length} session(s) in next month.`
+        `Found ${targets.length} ` +
+        `session(s) in next month.`
     );
 
     for (
@@ -566,8 +714,11 @@ async function handleMonthlyOpening(
 
         if (!start) {
             console.log(
-                `Skipping ${getName(session)}: could not parse date.`
+                `Skipping ` +
+                `${getName(session)}: ` +
+                `could not parse date.`
             );
+
             continue;
         }
 
@@ -577,40 +728,117 @@ async function handleMonthlyOpening(
                 'hours'
             ).hours;
 
-        // Do not let monthly opening override
-        // leadership/general deadline rules.
+        // Don't let monthly opening
+        // override the leadership
+        // 7-day rule.
         if (
-            getType(session) === 'Leadership' &&
+            getType(session) ===
+                'Leadership' &&
             hoursAway <= 168
         ) {
             console.log(
-                `Skipping leadership session inside 7-day deadline: ` +
+                `Skipping leadership ` +
+                `session inside ` +
+                `7-day deadline: ` +
                 getName(session)
             );
+
             continue;
         }
 
+        // Don't let monthly opening
+        // override the General
+        // 48-hour rule.
         if (
-            getType(session) === 'General' &&
+            getType(session) ===
+                'General' &&
             hoursAway <= 48
         ) {
             console.log(
-                `Skipping general session inside 48-hour deadline: ` +
+                `Skipping general ` +
+                `session inside ` +
+                `48-hour deadline: ` +
                 getName(session)
             );
+
             continue;
         }
 
         await setFrozen(
             session,
             'N',
-            'Monthly opening for next calendar month'
+            'Monthly opening for ' +
+            'next calendar month'
         );
     }
 }
 
 // ============================================================================
-// LEADERSHIP: EXACTLY 7 CALENDAR DAYS BEFORE
+// EMAIL STATE
+// ============================================================================
+
+function getLeadershipEmailMarkerPath(
+    now
+) {
+    const dateKey =
+        now.toISODate();
+
+    return path.join(
+        EMAIL_STATE_DIR,
+        `leadership-email-` +
+        `${dateKey}.sent`
+    );
+}
+
+function leadershipEmailAlreadySent(
+    now
+) {
+    return fs.existsSync(
+        getLeadershipEmailMarkerPath(
+            now
+        )
+    );
+}
+
+function markLeadershipEmailSent(
+    now
+) {
+    fs.mkdirSync(
+        EMAIL_STATE_DIR,
+        {
+            recursive: true
+        }
+    );
+
+    const markerPath =
+        getLeadershipEmailMarkerPath(
+            now
+        );
+
+    fs.writeFileSync(
+        markerPath,
+
+        `Sent at ${
+            DateTime.now()
+                .setZone(
+                    TIME_ZONE
+                )
+                .toISO()
+        }\n`,
+
+        'utf8'
+    );
+
+    console.log(
+        `✓ Saved leadership ` +
+        `email marker: ` +
+        `${markerPath}`
+    );
+}
+
+// ============================================================================
+// LEADERSHIP + SHADOWING
+// EXACTLY 7 CALENDAR DAYS BEFORE
 // ============================================================================
 
 async function processLeadership(
@@ -618,29 +846,34 @@ async function processLeadership(
     now
 ) {
     console.log('');
-    console.log(
-        '=================================================='
-    );
-    console.log(
-        'LEADERSHIP 7-DAY CHECK'
-    );
+
     console.log(
         '=================================================='
     );
 
-    const underfilledForEmail = [];
+    console.log(
+        'LEADERSHIP / SHADOWING 7-DAY CHECK'
+    );
+
+    console.log(
+        '=================================================='
+    );
+
+    const underfilledForEmail =
+        [];
 
     for (
         const session
         of sessions
     ) {
+        // Includes both Leadership
+        // and Shadowing.
         if (
-            getType(session) !== 'Leadership'
+            getType(session) !==
+            'Leadership'
         ) {
             continue;
         }
-
-       
 
         const start =
             getStart(session);
@@ -657,16 +890,14 @@ async function processLeadership(
 
         const calendarDaysAway =
             Math.round(
-                clinicDate
-                    .diff(
-                        today,
-                        'days'
-                    )
-                    .days
+                clinicDate.diff(
+                    today,
+                    'days'
+                ).days
             );
 
-        // Run the leadership rule only exactly
-        // 7 calendar days before the clinic.
+        // ONLY exactly 7
+        // calendar days before.
         if (
             calendarDaysAway !== 7
         ) {
@@ -677,11 +908,15 @@ async function processLeadership(
 
         try {
             coverage =
-                await getCoverage(session);
+                await getCoverage(
+                    session
+                );
         } catch (error) {
             console.log(
-                `✗ Coverage check failed for ${getName(session)}: ` +
-                error.message
+                `✗ Coverage check ` +
+                `failed for ` +
+                `${getName(session)}: ` +
+                `${error.message}`
             );
 
             continue;
@@ -689,48 +924,134 @@ async function processLeadership(
 
         console.log(
             `${getName(session)}: ` +
-            `${coverage.registered}/${coverage.required} filled`
+            `${coverage.registered}/` +
+            `${coverage.required} filled`
         );
+
+        // ----------------------------------------------------------
+        // FULL
+        // ----------------------------------------------------------
 
         if (coverage.full) {
             await setFrozen(
                 session,
                 'Y',
-                `Leadership full 7 days before clinic ` +
-                `(${coverage.registered}/${coverage.required})`
+                `Leadership full ` +
+                `7 days before clinic ` +
+                `(${coverage.registered}/` +
+                `${coverage.required})`
             );
-        } else {
+        }
+
+        // ----------------------------------------------------------
+        // UNDERFILLED
+        // ----------------------------------------------------------
+
+        else {
+            // Leave/open the shift
+            // so people can still sign up.
             await setFrozen(
                 session,
                 'N',
-                `Leadership underfilled 7 days before clinic ` +
-                `(${coverage.registered}/${coverage.required})`
+                `Leadership underfilled ` +
+                `7 days before clinic ` +
+                `(${coverage.registered}/` +
+                `${coverage.required})`
             );
 
-            // Only queue the email during the 8 PM hour,
-            // so an hourly workflow does not send repeated alerts.
-            if (now.hour === 20) {
-                underfilledForEmail.push({
-                    session,
-                    coverage
-                });
-            }
+            // Add it to ONE combined
+            // email report.
+            underfilledForEmail.push({
+                session,
+                coverage
+            });
         }
 
         await sleep(250);
     }
 
+    // Nothing underfilled today.
     if (
-        underfilledForEmail.length > 0
+        underfilledForEmail.length ===
+        0
     ) {
+        console.log(
+            'No underfilled leadership ' +
+            'sessions requiring an email.'
+        );
+
+        return;
+    }
+
+    // --------------------------------------------------------------
+    // EMAIL TIME
+    // --------------------------------------------------------------
+
+    // Do not require GitHub to run
+    // at exactly 8:00 AM.
+    //
+    // Any run after 8 AM can send.
+    if (
+        now.hour <
+        LEADERSHIP_EMAIL_START_HOUR
+    ) {
+        console.log(
+            `Leadership email ` +
+            `not sent yet. ` +
+            `Waiting until at least ` +
+            `${LEADERSHIP_EMAIL_START_HOUR}:00 ` +
+            `${TIME_ZONE}.`
+        );
+
+        return;
+    }
+
+    // --------------------------------------------------------------
+    // DUPLICATE PROTECTION
+    // --------------------------------------------------------------
+
+    if (
+        leadershipEmailAlreadySent(
+            now
+        )
+    ) {
+        console.log(
+            `Leadership coverage ` +
+            `email already sent for ` +
+            `${now.toISODate()}; ` +
+            `skipping duplicate.`
+        );
+
+        return;
+    }
+
+    // --------------------------------------------------------------
+    // SEND
+    // --------------------------------------------------------------
+
+    const sent =
         await sendLeadershipAlert(
             underfilledForEmail
+        );
+
+    // Only create marker after
+    // ACTUAL successful email.
+    //
+    // Failed email:
+    // next GitHub run retries.
+    //
+    // DRY RUN:
+    // marker is NOT created.
+    if (sent) {
+        markLeadershipEmailSent(
+            now
         );
     }
 }
 
 // ============================================================================
-// GENERAL: WITHIN 48 HOURS
+// GENERAL
+// WITHIN 48 HOURS
 // ============================================================================
 
 async function processGeneral(
@@ -738,12 +1059,15 @@ async function processGeneral(
     now
 ) {
     console.log('');
+
     console.log(
         '=================================================='
     );
+
     console.log(
         'GENERAL 48-HOUR CHECK'
     );
+
     console.log(
         '=================================================='
     );
@@ -753,7 +1077,8 @@ async function processGeneral(
         of sessions
     ) {
         if (
-            getType(session) !== 'General'
+            getType(session) !==
+            'General'
         ) {
             continue;
         }
@@ -782,11 +1107,15 @@ async function processGeneral(
 
         try {
             coverage =
-                await getCoverage(session);
+                await getCoverage(
+                    session
+                );
         } catch (error) {
             console.log(
-                `✗ Coverage check failed for ${getName(session)}: ` +
-                error.message
+                `✗ Coverage check ` +
+                `failed for ` +
+                `${getName(session)}: ` +
+                `${error.message}`
             );
 
             continue;
@@ -794,22 +1123,27 @@ async function processGeneral(
 
         console.log(
             `${getName(session)}: ` +
-            `${coverage.registered}/${coverage.required} filled`
+            `${coverage.registered}/` +
+            `${coverage.required} filled`
         );
 
         if (coverage.full) {
             await setFrozen(
                 session,
                 'Y',
-                `General shift full within 48 hours ` +
-                `(${coverage.registered}/${coverage.required})`
+                `General shift full ` +
+                `within 48 hours ` +
+                `(${coverage.registered}/` +
+                `${coverage.required})`
             );
         } else {
             await setFrozen(
                 session,
                 'N',
-                `General shift underfilled within 48 hours ` +
-                `(${coverage.registered}/${coverage.required})`
+                `General shift underfilled ` +
+                `within 48 hours ` +
+                `(${coverage.registered}/` +
+                `${coverage.required})`
             );
         }
 
@@ -826,13 +1160,15 @@ function emailConfigured() {
         SMTP_HOST &&
         SMTP_USER &&
         SMTP_PASS &&
-        EMAIL_FROM
+        EMAIL_FROM &&
+        ALERT_EMAIL
     );
 }
 
 async function sendLeadershipAlert(
     items
 ) {
+    // Sort shifts chronologically.
     const sorted =
         [...items].sort(
             (a, b) =>
@@ -842,6 +1178,7 @@ async function sendLeadershipAlert(
                     .toMillis()
         );
 
+    // Group by clinic date.
     const groupedByDate = {};
 
     for (
@@ -849,35 +1186,50 @@ async function sendLeadershipAlert(
         of sorted
     ) {
         const start =
-            getStart(item.session);
+            getStart(
+                item.session
+            );
 
         const dateKey =
             start.toISODate();
 
         if (
-            !groupedByDate[dateKey]
+            !groupedByDate[
+                dateKey
+            ]
         ) {
-            groupedByDate[dateKey] = [];
+            groupedByDate[
+                dateKey
+            ] = [];
         }
 
-        groupedByDate[dateKey]
-            .push(item);
+        groupedByDate[
+            dateKey
+        ].push(item);
     }
 
     let text = '';
 
     text +=
-        'The following St. Vincent\'s Clinic leadership shifts are one week away and are not fully covered.\n\n';
+        'The following St. Vincent\'s Clinic ' +
+        'leadership/shadowing shifts are one week away ' +
+        'and are not fully covered.\n\n';
 
     for (
-        const [date, dateItems]
-        of Object.entries(groupedByDate)
+        const [
+            date,
+            dateItems
+        ]
+        of Object.entries(
+            groupedByDate
+        )
     ) {
         const formattedDate =
             DateTime.fromISO(
                 date,
                 {
-                    zone: TIME_ZONE
+                    zone:
+                        TIME_ZONE
                 }
             ).toFormat(
                 'cccc, LLLL d, yyyy'
@@ -897,7 +1249,8 @@ async function sendLeadershipAlert(
 
             text +=
                 `- ${getName(session)}: ` +
-                `${coverage.registered}/${coverage.required} filled ` +
+                `${coverage.registered}/` +
+                `${coverage.required} filled ` +
                 `(${coverage.missing} still needed)\n`;
         }
 
@@ -905,62 +1258,119 @@ async function sendLeadershipAlert(
     }
 
     text +=
-        'These underfilled leadership shifts have been left open in Sched so additional coverage can be found.\n';
+        'These underfilled leadership/shadowing shifts ' +
+        'have been left open in Sched so additional ' +
+        'coverage can be found.\n';
 
     console.log('');
+
     console.log(
         '=================================================='
     );
+
     console.log(
         'LEADERSHIP COVERAGE EMAIL'
     );
+
     console.log(
         '=================================================='
     );
+
     console.log(text);
+
+    // --------------------------------------------------------------
+    // DRY RUN
+    // --------------------------------------------------------------
 
     if (DRY_RUN) {
         console.log(
-            `[DRY RUN] Would email ${ALERT_EMAIL}.`
+            `[DRY RUN] Would email ` +
+            `${ALERT_EMAIL}.`
         );
-        return;
+
+        return false;
     }
 
-    if (!emailConfigured()) {
+    // --------------------------------------------------------------
+    // CHECK CONFIGURATION
+    // --------------------------------------------------------------
+
+    if (
+        !emailConfigured()
+    ) {
         console.log(
-            '⚠ Email not sent because SMTP secrets are not configured.'
+            '⚠ Email not sent because ' +
+            'SMTP secrets are not configured.'
         );
 
         console.log(
-            `Intended recipient: ${ALERT_EMAIL}`
+            `Intended recipient: ` +
+            `${ALERT_EMAIL}`
         );
 
-        return;
+        return false;
     }
+
+    // --------------------------------------------------------------
+    // CREATE SMTP CONNECTION
+    // --------------------------------------------------------------
 
     const transporter =
         nodemailer.createTransport({
-            host: SMTP_HOST,
-            port: SMTP_PORT,
+            host:
+                SMTP_HOST,
+
+            port:
+                SMTP_PORT,
+
             secure:
                 SMTP_PORT === 465,
+
             auth: {
-                user: SMTP_USER,
-                pass: SMTP_PASS
+                user:
+                    SMTP_USER,
+
+                pass:
+                    SMTP_PASS
             }
         });
 
-    await transporter.sendMail({
-        from: EMAIL_FROM,
-        to: ALERT_EMAIL,
-        subject:
-            'St. Vincent’s Clinic Leadership Coverage Needed',
-        text
-    });
+    // --------------------------------------------------------------
+    // SEND EMAIL
+    // --------------------------------------------------------------
 
-    console.log(
-        `✓ Leadership coverage email sent to ${ALERT_EMAIL}`
-    );
+    try {
+        await transporter.sendMail({
+            from:
+                EMAIL_FROM,
+
+            to:
+                ALERT_EMAIL,
+
+            subject:
+                'St. Vincent’s Clinic Leadership Coverage Needed',
+
+            text
+        });
+
+        console.log(
+            `✓ Leadership coverage ` +
+            `email sent to ` +
+            `${ALERT_EMAIL}`
+        );
+
+        return true;
+    } catch (error) {
+        console.error(
+            `✗ Leadership coverage ` +
+            `email failed: ` +
+            `${error.message}`
+        );
+
+        // Don't save sent marker.
+        // Next GitHub run can retry.
+        return false;
+    }
 }
 
 // ============================================================================
@@ -982,18 +1392,22 @@ async function main() {
     );
 
     console.log(
-        `Mode: ${DRY_RUN
-            ? 'DRY RUN'
-            : 'LIVE'}`
+        `Mode: ${
+            DRY_RUN
+                ? 'DRY RUN'
+                : 'LIVE'
+        }`
     );
 
     console.log(
-        `Current time used by automation: ${now.toISO()}`
+        `Current time used by automation: ` +
+        `${now.toISO()}`
     );
 
     if (NOW_OVERRIDE) {
         console.log(
-            `*** USING SIMULATED TIME: ${NOW_OVERRIDE} ***`
+            `*** USING SIMULATED TIME: ` +
+            `${NOW_OVERRIDE} ***`
         );
     }
 
@@ -1002,25 +1416,46 @@ async function main() {
     );
 
     console.log(
-        `Fetching sessions from ${BASE_URL} ...`
+        `Leadership email may send ` +
+        `after: ` +
+        `${LEADERSHIP_EMAIL_START_HOUR}:00`
+    );
+
+    console.log(
+        `Fetching sessions from ` +
+        `${BASE_URL} ...`
     );
 
     const sessions =
         await fetchAllSessions();
 
     console.log(
-        `Fetched ${sessions.length} total sessions.`
+        `Fetched ` +
+        `${sessions.length} ` +
+        `total sessions.`
     );
+
+    // --------------------------------------------------------------
+    // MONTHLY OPENING
+    // --------------------------------------------------------------
 
     await handleMonthlyOpening(
         sessions,
         now
     );
 
+    // --------------------------------------------------------------
+    // LEADERSHIP + SHADOWING
+    // --------------------------------------------------------------
+
     await processLeadership(
         sessions,
         now
     );
+
+    // --------------------------------------------------------------
+    // GENERAL
+    // --------------------------------------------------------------
 
     await processGeneral(
         sessions,
@@ -1028,28 +1463,35 @@ async function main() {
     );
 
     console.log('');
+
     console.log(
         '=================================================='
     );
+
     console.log(
         'AUTOMATION COMPLETE'
     );
+
     console.log(
         '=================================================='
     );
 
     if (DRY_RUN) {
         console.log(
-            'No Sched changes or emails were made because DRY_RUN=true.'
+            'No Sched changes or emails ' +
+            'were made because ' +
+            'DRY_RUN=true.'
         );
     }
 }
 
-main().catch((error) => {
-    console.error(
-        'Fatal error:',
-        error
-    );
+main().catch(
+    (error) => {
+        console.error(
+            'Fatal error:',
+            error
+        );
 
-    process.exitCode = 1;
-});
+        process.exitCode = 1;
+    }
+);
