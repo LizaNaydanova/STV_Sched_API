@@ -290,7 +290,7 @@ function getType(session) {
             String(raw).toLowerCase();
 
         if (
-            type.includes('leadership')
+            type.includes('leadership') ||
             type.includes('shadowing')
         ) {
             return 'Leadership';
