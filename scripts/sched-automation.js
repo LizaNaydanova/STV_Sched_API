@@ -291,6 +291,7 @@ function getType(session) {
 
         if (
             type.includes('leadership')
+            type.includes('shadowing')
         ) {
             return 'Leadership';
         }
@@ -306,7 +307,8 @@ function getType(session) {
         getName(session).toLowerCase();
 
     if (
-        name.includes('leadership')
+        name.includes('leadership') ||
+        name.includes('shadowing')
     ) {
         return 'Leadership';
     }
@@ -638,12 +640,7 @@ async function processLeadership(
             continue;
         }
 
-        // Shadowing slots do not count as required leadership coverage. They do count*
-       // if (
-         //   isShadowingSession(session)
-        //) {
-         //   continue;
-        //}
+       
 
         const start =
             getStart(session);
