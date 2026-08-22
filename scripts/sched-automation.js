@@ -26,7 +26,7 @@ const SMTP_USER = process.env.SMTP_USER || '';
 const SMTP_PASS = process.env.SMTP_PASS || '';
 const EMAIL_FROM = process.env.EMAIL_FROM || '';
 const ALERT_EMAIL =
-    process.env.ALERT_EMAIL || 'gebugari@utmb.edu';
+    process.env.ALERT_EMAIL
 
 const BASE_URL =
     `https://${SUBDOMAIN}.sched.com/api`;
