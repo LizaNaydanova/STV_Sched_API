@@ -638,12 +638,12 @@ async function processLeadership(
             continue;
         }
 
-        // Shadowing slots do not count as required leadership coverage.
-        if (
-            isShadowingSession(session)
-        ) {
-            continue;
-        }
+        // Shadowing slots do not count as required leadership coverage. They do count*
+       // if (
+         //   isShadowingSession(session)
+        //) {
+         //   continue;
+        //}
 
         const start =
             getStart(session);
