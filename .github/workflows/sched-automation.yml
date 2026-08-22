@@ -70,7 +70,7 @@ jobs:
 
           NOW_OVERRIDE: ${{ github.event_name == 'workflow_dispatch' && inputs.simulated_now || '' }}
 
-          ALERT_EMAIL: stvpolicies@utmb.edu
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
 
           # Optional email configuration.
           # Sched automation still works without these.
