@@ -45,6 +45,19 @@ jobs:
           npm install
           npm install luxon nodemailer
 
+      #This makes the once-per-day email marker persist across GitHub Actions runs.
+
+      - name: Get Central date for email cache
+        id: email-date
+        shell: bash
+        run: echo "date=$(TZ=America/Chicago date +%F)" >> "$GITHUB_OUTPUT"
+        
+      - name: Restore leadership email state
+        uses: actions/cache@v4
+        with:
+          path: .automation-state
+          key: leadership-email-${{ steps.email-date.outputs.date }}
+
       - name: Run Sched automation
         env:
           SCHED_API_KEY: ${{ secrets.SCHED_API_KEY }}
