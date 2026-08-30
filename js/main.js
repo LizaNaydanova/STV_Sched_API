@@ -33,7 +33,7 @@ const clinicConfigs = {
             { name: "Ophtho Lead", start: "16:15", end: "18:15", seats: 1 },
             { name: "Ophtho Volunteer", start: "16:15", end: "18:15", seats: 2 },
             { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 4 },
-            { name: "Nursing", start: "16:15", end: "18:15", seats: 2 },
+            { name: "Nursing", start: "16:15", end: "20:15", seats: 2 },
             { name: "Podiatry", start: "16:15", end: "18:15", seats: 2 }
         ],
         shifts: {
@@ -52,7 +52,7 @@ const clinicConfigs = {
             { name: "Ophtho Lead", start: "16:15", end: "18:15", seats: 1 },
             { name: "Ophtho Volunteer", start: "16:15", end: "18:15", seats: 2 },
             { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 4 },
-            { name: "Nursing", start: "16:15", end: "18:15", seats: 2 },
+            { name: "Nursing", start: "16:15", end: "20:15", seats: 2 },
             { name: "Family Planning Lead", start: "16:15", end: "18:15", seats: 2 },
             { name: "Family Planning Volunteer", start: "16:15", end: "18:15", seats: 2 },
             { name: "Family Planning Volunteer", start: "17:15", end: "19:15", seats: 2 },
@@ -74,7 +74,7 @@ const clinicConfigs = {
             { name: "Ophtho Lead", start: "16:15", end: "18:15", seats: 1 },
             { name: "Ophtho Volunteer", start: "16:15", end: "18:15", seats: 2 },
             { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 4 },
-            { name: "Nursing", start: "16:15", end: "18:15", seats: 2 },
+            { name: "Nursing", start: "16:15", end: "20:15", seats: 2 },
             { name: "Audiology", start: "16:15", end: "18:15", seats: 2 }
         ],
         shifts: {
@@ -91,7 +91,7 @@ const clinicConfigs = {
         ],
         general: [
             { name: "MS3/MS4/AI", start: "08:45", end: "11:15", seats: 4 },
-            { name: "Nursing", start: "08:45", end: "11:15", seats: 2 }
+            { name: "Nursing", start: "08:45", end: "13:15", seats: 2 }
         ],
         shifts: {
             Experienced: [{ s: "08:45", e: "11:30", c: 2 }, { s: "10:00", e: "12:30", c: 2 }],
@@ -106,8 +106,8 @@ const clinicConfigs = {
             { name: "Leadership Volunteer", start: "17:45", end: "19:45", seats: 2 }
         ],
         general: [
-            { name: "MS3/MS4/AI", start: "16:45", end: "19:00", seats: 4 },
-            { name: "Nursing", start: "16:45", end: "19:00", seats: 2 }
+            { name: "MS3/MS4/AI", start: "16:45", end: "18:15", seats: 4 },
+            { name: "Nursing", start: "16:45", end: "20:15", seats: 2 }
         ],
         shifts: {
             Experienced: [{ s: "16:45", e: "19:00", c: 5 }, { s: "17:45", e: "19:45", c: 5 }],
@@ -123,7 +123,7 @@ const clinicConfigs = {
         ],
         general: [
             { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 4 },
-            { name: "Nursing", start: "16:15", end: "18:15", seats: 2 }
+            { name: "Nursing", start: "16:15", end: "20:15", seats: 2 }
         ],
         shifts: {
             Experienced: [{ s: "16:15", e: "18:15", c: 3 }, { s: "17:00", e: "19:00", c: 4 }, { s: "17:30", e: "19:30", c: 2 }],
@@ -139,7 +139,7 @@ const clinicConfigs = {
         ],
         general: [
             { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 4 },
-            { name: "Nursing", start: "16:15", end: "18:15", seats: 2 }
+            { name: "Nursing", start: "16:15", end: "20:15", seats: 2 }
         ],
         shifts: {
             Experienced: [{ s: "16:15", e: "18:15", c: 4 }, { s: "17:30", e: "19:30", c: 4 }],
@@ -155,7 +155,7 @@ const clinicConfigs = {
         ],
         general: [
             { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 4 },
-            { name: "Nursing", start: "16:15", end: "18:15", seats: 2 }
+            { name: "Nursing", start: "16:15", end: "20:15", seats: 2 }
         ],
         shifts: {
             Experienced: [{ s: "16:15", e: "18:15", c: 4 }, { s: "17:30", e: "19:30", c: 4 }],
@@ -164,18 +164,18 @@ const clinicConfigs = {
     },
     "Neuro": {
         venue: "Neuro",
-        leadership_times: { start: "08:30", end: "12:15" },
+        leadership_times: { start: "08:00", end: "12:15" },
         leadership_volunteer_slots: [
-            { name: "Leadership Volunteer", start: "09:15", end: "11:15", seats: 3 },
-            { name: "Leadership Volunteer", start: "10:00", end: "12:30", seats: 3 }
+            { name: "Leadership Volunteer", start: "08:15", end: "11:15", seats: 3 },
+            { name: "Leadership Volunteer", start: "9:00", end: "12:30", seats: 3 }
         ],
         general: [
-            { name: "MS3/MS4/AI", start: "09:15", end: "11:15", seats: 4 },
-            { name: "Nursing", start: "09:15", end: "11:15", seats: 2 }
+            { name: "MS3/MS4/AI", start: "08:15", end: "11:15", seats: 4 },
+            { name: "Nursing", start: "08:15", end: "12:15", seats: 2 }
         ],
         shifts: {
-            Experienced: [{ s: "09:15", e: "11:15", c: 3 }, { s: "10:00", e: "12:30", c: 3 }],
-            New: [{ s: "09:15", e: "11:15", c: 3 }, { s: "10:00", e: "12:30", c: 3 }]
+            Experienced: [{ s: "08:15", e: "11:15", c: 3 }, { s: "9:00", e: "12:30", c: 3 }],
+            New: [{ s: "08:15", e: "11:15", c: 3 }, { s: "9:00", e: "12:30", c: 3 }]
         }
     }
 };

@@ -20,22 +20,35 @@ app.post('/api/*', async (req, res) => {
     try {
         // Extract the path after /api/
         const apiPath = req.params[0];
-        const schedUrl = `https://${SUBDOMAIN}.sched.com/api/${apiPath}`;
 
-        // Forward the request to Sched.com
-        const formData = new URLSearchParams();
-        for (const key in req.body) {
-            formData.append(key, req.body[key]);
-        }
+        // Ticket API endpoints (ticket/*) expect the api_key as a query string
+        // parameter and a raw JSON body (often an array for batch operations),
+        // unlike the main event API which is form-encoded with api_key in the body.
+        const isTicketApi = apiPath.startsWith('ticket/');
 
-        const response = await fetch(schedUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'User-Agent': 'STV-Sched-API/1.0'
-            },
-            body: formData.toString()
-        });
+        const schedUrl = isTicketApi
+            ? `https://${SUBDOMAIN}.sched.com/api/${apiPath}?${new URLSearchParams(req.query).toString()}`
+            : `https://${SUBDOMAIN}.sched.com/api/${apiPath}`;
+
+        const fetchOptions = isTicketApi
+            ? {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'STV-Sched-API/1.0'
+                },
+                body: JSON.stringify(req.body)
+            }
+            : {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'User-Agent': 'STV-Sched-API/1.0'
+                },
+                body: new URLSearchParams(req.body).toString()
+            };
+
+        const response = await fetch(schedUrl, fetchOptions);
 
         const responseText = await response.text();
 
