@@ -19,3 +19,6 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+
+# Contains student names/emails - this repo is public, keep it local-only
+historical_attendance/

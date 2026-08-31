@@ -1,6 +1,7 @@
 // Finds users who hold a "new" ticket and have been checked in to at least
 // CHECKIN_THRESHOLD shifts, i.e. candidates ready to be moved from "new" to
-// "exp". Run directly (locally or from CI):
+// "exp". Counts both live Sched checkins and historical checkins from a CSV
+// export of now-deleted sessions. Run directly (locally or from CI):
 //
 //   SCHED_API_KEY=xxx node scripts/new-to-exp.js
 //
@@ -10,6 +11,7 @@
 //   CHECKIN_THRESHOLD  (default: 3) minimum number of checked-in shifts to qualify
 //   TICKET_BATCH_SIZE  (default: 100) users per ticket/user/get batch call
 //   THROTTLE_MS        (default: 500) delay between session/seats calls
+//   HISTORICAL_CSV     (default: historical_attendance/old_shifts.csv) historical checkin export
 //
 // NOTE: going/list and going/schedule were tried first to get each user's
 // session history directly, but a live test proved they silently ignore the
@@ -25,18 +27,33 @@
 // at least one "new" ticket holder is actually registered for, instead of
 // every session on the event.
 //
+// HISTORICAL_CSV covers shifts (Jul 2025 - Jul 2 2026) whose sessions have
+// since been deleted from Sched entirely, so they can never show up via
+// going/all/session/seats. To avoid double-counting any shift that happens
+// to appear in both sources, checkins are deduped per user by session
+// *name* (e.g. "06/06_Medicine_New_9:15 AM") rather than just counted -
+// that name format is shared by both the CSV's "Session Name" column and
+// Sched's own session 'name' field, and already encodes date/clinic/time,
+// making it a reliable per-shift identifier across both sources.
+//
 // Pipeline:
 //   1. user/list        - every user on the event
 //   2. ticket/user/get  - (batched) which of them hold a "new" ticket
 //   3. going/all        - every user's registered session keys (one call)
-//   4. session/seats    - only for sessions a "new" user is registered for
+//   4. session/export   - to resolve session keys to their display name
+//   5. session/seats    - only for sessions a "new" user is registered for
+//   6. HISTORICAL_CSV   - merged in, deduped by (email, session name)
 const fetch = require('node-fetch');
+const fs = require('fs');
+const nodePath = require('path');
 
 const SCHED_API_KEY = process.env.SCHED_API_KEY;
 const SUBDOMAIN = process.env.SCHED_SUBDOMAIN || 'stvincentsclinic2025';
 const CHECKIN_THRESHOLD = parseInt(process.env.CHECKIN_THRESHOLD || '3', 10);
 const TICKET_BATCH_SIZE = parseInt(process.env.TICKET_BATCH_SIZE || '100', 10);
 const THROTTLE_MS = parseInt(process.env.THROTTLE_MS || '500', 10);
+const HISTORICAL_CSV = process.env.HISTORICAL_CSV
+    || nodePath.join(__dirname, '..', 'historical_attendance', 'old_shifts.csv');
 
 const BASE_URL = `https://${SUBDOMAIN}.sched.com/api`;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -124,9 +141,126 @@ async function fetchGoingAll() {
     return (response && typeof response === 'object' && !Array.isArray(response)) ? response : {};
 }
 
-async function tallyCheckins(newUsers, goingAll) {
-    // Narrow session/seats calls to only sessions at least one "new" user is
-    // registered for, instead of every session on the event.
+async function fetchAllSessions() {
+    const sessions = [];
+    const limit = 1000;
+    let page = 1;
+    for (;;) {
+        const batch = await schedApiCall('session/export', {
+            format: 'json',
+            page: String(page),
+            limit: String(limit)
+        });
+        if (!Array.isArray(batch) || batch.length === 0) break;
+        sessions.push(...batch);
+        if (batch.length < limit) break;
+        page += 1;
+    }
+    return sessions;
+}
+
+function getField(session, ...candidates) {
+    for (const c of candidates) {
+        if (session[c] !== undefined) return session[c];
+    }
+    const lowerMap = {};
+    for (const k of Object.keys(session)) lowerMap[k.toLowerCase()] = k;
+    for (const c of candidates) {
+        const realKey = lowerMap[c.toLowerCase()];
+        if (realKey !== undefined && session[realKey] !== undefined) return session[realKey];
+    }
+    return undefined;
+}
+
+const getKey = (s) => getField(s, 'session_key', 'event_key', 'key', 'session_id');
+const getName = (s) => getField(s, 'name', 'event_name', 'title');
+
+// Minimal RFC 4180-style CSV parser (handles quoted fields containing
+// commas, e.g. "Junior Director, Pharmacy", and escaped "" quotes).
+function parseCsv(text) {
+    const rows = [];
+    let row = [];
+    let field = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (inQuotes) {
+            if (c === '"') {
+                if (text[i + 1] === '"') { field += '"'; i++; } else { inQuotes = false; }
+            } else {
+                field += c;
+            }
+        } else if (c === '"') {
+            inQuotes = true;
+        } else if (c === ',') {
+            row.push(field);
+            field = '';
+        } else if (c === '\r') {
+            // ignore, \n (or end-of-file) below ends the row
+        } else if (c === '\n') {
+            row.push(field);
+            rows.push(row);
+            row = [];
+            field = '';
+        } else {
+            field += c;
+        }
+    }
+    if (field.length > 0 || row.length > 0) {
+        row.push(field);
+        rows.push(row);
+    }
+    return rows;
+}
+
+// Returns Map<lowercased email, Set<session name>> of shifts the CSV shows
+// as actually checked in (Checked-in === 'Y' and a Check-in Date present).
+function loadHistoricalShifts(csvPath) {
+    const historical = new Map();
+    if (!fs.existsSync(csvPath)) {
+        console.log(`No historical CSV found at ${csvPath} - skipping.`);
+        return historical;
+    }
+
+    const rows = parseCsv(fs.readFileSync(csvPath, 'utf8'));
+    if (rows.length === 0) return historical;
+
+    const header = rows[0].map((h) => h.trim().toLowerCase());
+    const idx = {
+        email: header.indexOf('email'),
+        sessionName: header.indexOf('session name'),
+        checkedIn: header.indexOf('checked-in'),
+        checkinDate: header.indexOf('check-in date')
+    };
+
+    for (const cols of rows.slice(1)) {
+        if (cols.length < header.length) continue;
+        const email = (cols[idx.email] || '').trim().toLowerCase();
+        const sessionName = (cols[idx.sessionName] || '').trim();
+        const checkedIn = (cols[idx.checkedIn] || '').trim().toUpperCase();
+        const checkinDate = (cols[idx.checkinDate] || '').trim();
+        if (!email || !sessionName || checkedIn !== 'Y' || !checkinDate) continue;
+
+        if (!historical.has(email)) historical.set(email, new Set());
+        historical.get(email).add(sessionName);
+    }
+
+    return historical;
+}
+
+async function buildKeyToNameMap() {
+    const sessions = await fetchAllSessions();
+    const map = new Map();
+    for (const s of sessions) {
+        const key = getKey(s);
+        if (key) map.set(key, getName(s) || key);
+    }
+    return map;
+}
+
+// Returns Map<lowercased email, Set<session name>> of live checkins.
+async function tallyLiveCheckins(newUsers, goingAll, keyToName) {
     const relevantSessions = new Set();
     for (const u of newUsers) {
         for (const key of (goingAll[u.username] || [])) relevantSessions.add(key);
@@ -134,7 +268,7 @@ async function tallyCheckins(newUsers, goingAll) {
 
     console.log(`Narrowed to ${relevantSessions.size} session(s) registered to a "new" ticket holder (out of ${Object.keys(goingAll).length} users tracked by going/all).`);
 
-    const checkinCounts = new Map(); // email -> number of sessions with a checkin_date
+    const liveShifts = new Map(); // email -> Set<session name>
     let i = 0;
     for (const key of relevantSessions) {
         i += 1;
@@ -146,10 +280,13 @@ async function tallyCheckins(newUsers, goingAll) {
             continue;
         }
 
+        const sessionName = keyToName.get(key) || key;
         if (Array.isArray(seats)) {
             for (const attendee of seats) {
                 if (attendee.email && attendee.checkin_date) {
-                    checkinCounts.set(attendee.email, (checkinCounts.get(attendee.email) || 0) + 1);
+                    const email = attendee.email.trim().toLowerCase();
+                    if (!liveShifts.has(email)) liveShifts.set(email, new Set());
+                    liveShifts.get(email).add(sessionName);
                 }
             }
         }
@@ -158,7 +295,7 @@ async function tallyCheckins(newUsers, goingAll) {
         await sleep(THROTTLE_MS);
     }
 
-    return checkinCounts;
+    return liveShifts;
 }
 
 async function main() {
@@ -182,16 +319,28 @@ async function main() {
     console.log('\nFetching going/all (every user\'s registered sessions)...');
     const goingAll = await fetchGoingAll();
 
+    console.log('\nFetching session/export (to resolve session names)...');
+    const keyToName = await buildKeyToNameMap();
+
     console.log('\nScanning session/seats for the narrowed session set...');
-    const checkinCounts = await tallyCheckins(newUsers, goingAll);
+    const liveShifts = await tallyLiveCheckins(newUsers, goingAll, keyToName);
 
-    const qualifying = newUsers
-        .map((u) => ({ ...u, checkedInShifts: checkinCounts.get(u.email) || 0 }))
-        .filter((u) => u.checkedInShifts >= CHECKIN_THRESHOLD);
+    console.log(`\nLoading historical checkins from ${HISTORICAL_CSV} ...`);
+    const historicalShifts = loadHistoricalShifts(HISTORICAL_CSV);
 
-    console.log('\nChecked-in shift counts for all "new" ticket holders:');
-    for (const u of newUsers) {
-        console.log(`  ${u.username} (${u.email}) - checked in to ${checkinCounts.get(u.email) || 0} shift(s)`);
+    const withCounts = newUsers.map((u) => {
+        const email = (u.email || '').trim().toLowerCase();
+        const live = liveShifts.get(email) || new Set();
+        const historical = historicalShifts.get(email) || new Set();
+        const merged = new Set([...live, ...historical]);
+        return { ...u, liveCount: live.size, historicalCount: historical.size, checkedInShifts: merged.size };
+    });
+
+    const qualifying = withCounts.filter((u) => u.checkedInShifts >= CHECKIN_THRESHOLD);
+
+    console.log('\nChecked-in shift counts for all "new" ticket holders (live + historical, deduped):');
+    for (const u of withCounts) {
+        console.log(`  ${u.username} (${u.email}) - live: ${u.liveCount}, historical: ${u.historicalCount}, total unique: ${u.checkedInShifts}`);
     }
 
     console.log(`\n=== Users with a "new" ticket checked in to ${CHECKIN_THRESHOLD}+ shifts ===`);
