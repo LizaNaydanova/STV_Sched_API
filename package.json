@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "freeze": "node scripts/freeze-shifts.js"
+    "freeze": "node scripts/freeze-shifts.js",
+    "new-to-exp": "node scripts/new-to-exp.js"
   },
   "keywords": ["sched", "api", "proxy"],
   "author": "",
