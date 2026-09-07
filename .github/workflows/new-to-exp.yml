@@ -52,11 +52,14 @@ jobs:
       #    - HISTORICAL_GIST_ID: the gist ID
       #    - HISTORICAL_GIST_TOKEN: the personal access token
       - name: Download historical attendance CSV
-        if: ${{ secrets.HISTORICAL_GIST_ID != '' && secrets.HISTORICAL_GIST_TOKEN != '' }}
         env:
           GIST_ID: ${{ secrets.HISTORICAL_GIST_ID }}
           GIST_TOKEN: ${{ secrets.HISTORICAL_GIST_TOKEN }}
         run: |
+          if [ -z "$GIST_ID" ] || [ -z "$GIST_TOKEN" ]; then
+            echo "Gist secrets not configured - skipping historical CSV download"
+            exit 0
+          fi
           mkdir -p historical_attendance
           curl -sL \
             -H "Authorization: token $GIST_TOKEN" \
