@@ -312,13 +312,16 @@ function emailConfigured() {
 async function sendTicketUpgradeEmail(user) {
     const userName = user.name || user.username;
     const subject = "You're Now an Experienced STV Volunteer — Action Required";
+
+    const skillsFormUrl = 'https://forms.cloud.microsoft.com/r/8VfvWqGnmd';
+
     const text = `Hello ${userName},
 
 Congratulations! Our records show that you have completed three "new" volunteer shifts, and you have now been transitioned from a new to an experienced volunteer.
 
 Before you sign up for experienced shifts, please complete the STV Experienced Volunteer Skills Check Form:
 
-https://forms.cloud.microsoft.com/r/8VfvWqGnmd
+${skillsFormUrl}
 
 Completing the skills check form ensures your records are up to date and that you're ready for your experienced role.
 
@@ -326,6 +329,21 @@ Thank you for your continued dedication to serving our community. If you have an
 
 Best regards,
 St. Vincent's Leadership`;
+
+    const html = `<p>Hello ${userName},</p>
+
+<p>Congratulations! Our records show that you have completed three "new" volunteer shifts, and you have now been transitioned from a new to an experienced volunteer.</p>
+
+<p>Before you sign up for experienced shifts, please complete the STV Experienced Volunteer Skills Check Form:</p>
+
+<p><a href="${skillsFormUrl}">${skillsFormUrl}</a></p>
+
+<p>Completing the skills check form ensures your records are up to date and that you're ready for your experienced role.</p>
+
+<p>Thank you for your continued dedication to serving our community. If you have any questions or concerns, please reach out to <a href="mailto:stvsc@utmb.edu">stvsc@utmb.edu</a>.</p>
+
+<p>Best regards,<br>
+St. Vincent's Leadership</p>`;
 
     console.log(`  Sending email notification for ${user.username}...`);
 
@@ -352,7 +370,8 @@ St. Vincent's Leadership`;
             from: CONFIG.emailFrom,
             to: adminRecipients.join(', '),
             subject,
-            text
+            text,
+            html
         });
         console.log(`    ✓ Email sent to ${adminRecipients.join(', ')}`);
 
@@ -362,7 +381,8 @@ St. Vincent's Leadership`;
                 from: CONFIG.emailFrom,
                 to: user.email,
                 subject,
-                text
+                text,
+                html
             });
             console.log(`    ✓ Email sent to user: ${user.email}`);
         } else if (CONFIG.dryRun && user.email) {
