@@ -67,8 +67,7 @@ const CONFIG = {
         user: process.env.SMTP_USER || '',
         pass: process.env.SMTP_PASS || ''
     },
-    emailFrom: process.env.EMAIL_FROM || '',
-    notifyEmail: 'eanaydan@utmb.edu'
+    emailFrom: process.env.EMAIL_FROM || ''
 };
 
 const BASE_URL = `https://${CONFIG.subdomain}.sched.com/api`;
@@ -305,12 +304,28 @@ function emailConfigured() {
 
 /**
  * Sends an individual email notification about ticket upgrade.
+ * In both dry run and real run: sends to eanaydan@utmb.edu and stvsc@utmb.edu
+ * In real run only: also sends to the user's actual email
  * @param {Object} user - User object with username, email, name
  * @returns {Promise<boolean>} True if sent successfully
  */
 async function sendTicketUpgradeEmail(user) {
-    const subject = 'St. Vincent\'s Clinic - Experienced Volunteer Status';
-    const text = `You have completed 3 New Volunteer shifts and have been given an experienced ticket. As a reminder, you must complete the checklist.`;
+    const userName = user.name || user.username;
+    const subject = "You're Now an Experienced STV Volunteer — Action Required";
+    const text = `Hello ${userName},
+
+Congratulations! Our records show that you have completed three "new" volunteer shifts, and you have now been transitioned from a new to an experienced volunteer.
+
+Before you sign up for experienced shifts, please complete the STV Experienced Volunteer Skills Check Form:
+
+https://forms.cloud.microsoft.com/r/8VfvWqGnmd
+
+Completing the skills check form ensures your records are up to date and that you're ready for your experienced role.
+
+Thank you for your continued dedication to serving our community. If you have any questions or concerns, please reach out to stvsc@utmb.edu.
+
+Best regards,
+St. Vincent's Leadership`;
 
     console.log(`  Sending email notification for ${user.username}...`);
 
@@ -329,14 +344,31 @@ async function sendTicketUpgradeEmail(user) {
         }
     });
 
+    // Always send to admin emails (both dry run and real run)
+    const adminRecipients = ['eanaydan@utmb.edu', 'stvsc@utmb.edu'];
+
     try {
         await transporter.sendMail({
             from: CONFIG.emailFrom,
-            to: CONFIG.notifyEmail,
+            to: adminRecipients.join(', '),
             subject,
             text
         });
-        console.log(`    ✓ Email sent to ${CONFIG.notifyEmail}`);
+        console.log(`    ✓ Email sent to ${adminRecipients.join(', ')}`);
+
+        // In real run, also send to the user's email
+        if (!CONFIG.dryRun && user.email) {
+            await transporter.sendMail({
+                from: CONFIG.emailFrom,
+                to: user.email,
+                subject,
+                text
+            });
+            console.log(`    ✓ Email sent to user: ${user.email}`);
+        } else if (CONFIG.dryRun && user.email) {
+            console.log(`    [DRY RUN] Would also send to user: ${user.email}`);
+        }
+
         return true;
     } catch (error) {
         console.error(`    ✗ Email failed: ${error.message}`);
@@ -693,7 +725,10 @@ async function main() {
 
     console.log('New-to-Exp Volunteer Upgrade Script');
     console.log(`Mode: ${CONFIG.dryRun ? 'DRY RUN' : 'LIVE'}`);
-    console.log(`Notification emails will be sent to: ${CONFIG.notifyEmail}`);
+    console.log('Notification emails will be sent to: eanaydan@utmb.edu, stvsc@utmb.edu');
+    if (!CONFIG.dryRun) {
+        console.log('User emails will also be sent to each upgraded volunteer');
+    }
     console.log('');
 
     // Step 1: Fetch all users
