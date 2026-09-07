@@ -29,7 +29,6 @@
  *   SMTP_USER          SMTP username
  *   SMTP_PASS          SMTP password
  *   EMAIL_FROM         From address for emails
- *   ALERT_EMAIL        (default: eanaydan@utmb.edu) recipient for notifications
  *
  * Pipeline:
  *   1. user/list           - fetch all event users
@@ -69,7 +68,7 @@ const CONFIG = {
         pass: process.env.SMTP_PASS || ''
     },
     emailFrom: process.env.EMAIL_FROM || '',
-    alertEmail: process.env.ALERT_EMAIL || 'eanaydan@utmb.edu'
+    notifyEmail: 'eanaydan@utmb.edu'
 };
 
 const BASE_URL = `https://${CONFIG.subdomain}.sched.com/api`;
@@ -300,8 +299,7 @@ function emailConfigured() {
         CONFIG.smtp.host &&
         CONFIG.smtp.user &&
         CONFIG.smtp.pass &&
-        CONFIG.emailFrom &&
-        CONFIG.alertEmail
+        CONFIG.emailFrom
     );
 }
 
@@ -334,11 +332,11 @@ async function sendTicketUpgradeEmail(user) {
     try {
         await transporter.sendMail({
             from: CONFIG.emailFrom,
-            to: CONFIG.alertEmail,
+            to: CONFIG.notifyEmail,
             subject,
             text
         });
-        console.log(`    ✓ Email sent to ${CONFIG.alertEmail}`);
+        console.log(`    ✓ Email sent to ${CONFIG.notifyEmail}`);
         return true;
     } catch (error) {
         console.error(`    ✗ Email failed: ${error.message}`);
@@ -695,7 +693,7 @@ async function main() {
 
     console.log('New-to-Exp Volunteer Upgrade Script');
     console.log(`Mode: ${CONFIG.dryRun ? 'DRY RUN' : 'LIVE'}`);
-    console.log(`Alert email recipient: ${CONFIG.alertEmail}`);
+    console.log(`Notification emails will be sent to: ${CONFIG.notifyEmail}`);
     console.log('');
 
     // Step 1: Fetch all users
