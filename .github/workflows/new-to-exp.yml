@@ -1,0 +1,83 @@
+name: New-to-Exp Volunteer Upgrade
+
+# Runs at 11:17 PM Central Time on Tuesday, Thursday, Saturday.
+# Central Time is UTC-5 (CDT, Mar-Nov) or UTC-6 (CST, Nov-Mar).
+# 11:17 PM CDT = 04:17 UTC next day
+# 11:17 PM CST = 05:17 UTC next day
+# Using 04:17 UTC (11:17 PM during daylight saving, 10:17 PM during standard).
+#
+# Tuesday 11:17 PM Central = Wednesday 04:17 UTC (day 3)
+# Thursday 11:17 PM Central = Friday 04:17 UTC (day 5)
+# Saturday 11:17 PM Central = Sunday 04:17 UTC (day 0)
+
+on:
+  schedule:
+    - cron: '17 4 * * 0,3,5'
+
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Practice only — do not change tickets (emails still sent)'
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  new-to-exp:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install
+
+      # Download historical CSV from private gist.
+      # Setup instructions:
+      # 1. Go to https://gist.github.com and create a new SECRET gist
+      # 2. Name the file "old_shifts.csv" and paste the CSV content
+      # 3. Save and copy the Gist ID from the URL (the long hex string)
+      # 4. Create a Personal Access Token at https://github.com/settings/tokens
+      #    with "gist" scope only
+      # 5. Add these repository secrets:
+      #    - HISTORICAL_GIST_ID: the gist ID
+      #    - HISTORICAL_GIST_TOKEN: the personal access token
+      - name: Download historical attendance CSV
+        if: ${{ secrets.HISTORICAL_GIST_ID != '' && secrets.HISTORICAL_GIST_TOKEN != '' }}
+        env:
+          GIST_ID: ${{ secrets.HISTORICAL_GIST_ID }}
+          GIST_TOKEN: ${{ secrets.HISTORICAL_GIST_TOKEN }}
+        run: |
+          mkdir -p historical_attendance
+          curl -sL \
+            -H "Authorization: token $GIST_TOKEN" \
+            -H "Accept: application/vnd.github.v3.raw" \
+            "https://api.github.com/gists/$GIST_ID" \
+            | jq -r '.files["old_shifts.csv"].content' \
+            > historical_attendance/old_shifts.csv
+          echo "Downloaded historical CSV ($(wc -l < historical_attendance/old_shifts.csv) lines)"
+
+      - name: Run new-to-exp upgrade
+        env:
+          SCHED_API_KEY: ${{ secrets.SCHED_API_KEY }}
+          SCHED_SUBDOMAIN: stvincentsclinic2025
+
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+
+        run: node scripts/new-to-exp.js
