@@ -1,0 +1,48 @@
+name: Student Announcements
+
+on:
+  schedule:
+    # 21:00 UTC on the 21st and 28th = 4 PM CDT / 3 PM CST.
+    # Deliberately early: GitHub's free-tier scheduler queues runs and can fire
+    # 30+ minutes late, and this leaves ~4 hours of slack before the 8 PM
+    # deadline. A late run is still a fine run.
+    - cron: '0 21 21,28 * *'
+
+  # Manual fire, in case GitHub drops the scheduled run entirely.
+  workflow_dispatch:
+    inputs:
+      which:
+        description: 'Which email to send'
+        type: choice
+        options: [release, limits]
+        default: release
+      dry_run:
+        description: 'Print the email without sending it'
+        type: boolean
+        default: true
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm install --omit=dev
+
+      - name: Send announcement
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          STUDENT_EMAIL: ${{ secrets.STUDENT_EMAIL }}
+          REPLY_TO: ${{ secrets.REPLY_TO }}
+          TIME_ZONE: America/Chicago
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: node send-announcement.js ${{ inputs.which }}
