@@ -35,12 +35,10 @@
 # Monthly Tasks
 1. Generate Leadership Shifts
 2. Generate General Slots; 
-FUTURE TODO: ophtho should be every other tuesday, handling for admin days, handling for nephro, leadership shadowing optional button
+      FUTURE TODO: handling for admin days; leadership shadowing optional button
 3. Check slots against schedule for any cancelled clinic days
 4. Make admin/dental day if extra Saturday
 5. Leadership shadowing slots
-6. Preceptorship slots - check with Emily how many
-7. OBGYN needs type changed so obgyn tickets are specific
 8. Delete extra ophtho
 9. Make changes to .../Nephro clinic if happens that month
 

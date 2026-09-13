@@ -15,32 +15,13 @@ const leadershipRoles = [
     //{ name: "Front Desk Shadowing", seats: 1 },
     { name: "In Person Support", seats: 1 },
     //{ name: "In Person Support Shadowing", seats: 1 },
-    //{ name: "Distance Support", seats: 1 },
-    { name: "Pharmacy", seats: 1 },
+    { name: "Distance Support", seats: 1 },
+    { name: "Pharmacy", seats: 1 }
     //{ name: "Pharmacy Shadowing", seats: 1 }
 ];
 
 // Clinic configurations
 const clinicConfigs = {
-    "Medicine_Podiatry": {
-        venue: "Medicine/Podiatry",
-        leadership_times: { start: "16:15", end: "20:15" },
-        leadership_volunteer_slots: [
-            { name: "Leadership Volunteer", start: "16:15", end: "18:15", seats: 3 },
-            { name: "Leadership Volunteer", start: "17:30", end: "19:30", seats: 2 }
-        ],
-        general: [
-            { name: "Ophtho Lead", start: "16:15", end: "18:15", seats: 1 },
-            { name: "Ophtho Volunteer", start: "16:15", end: "18:15", seats: 2 },
-            { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 4 },
-            { name: "Nursing", start: "16:15", end: "20:15", seats: 2 },
-            { name: "Podiatry", start: "16:15", end: "18:15", seats: 2 }
-        ],
-        shifts: {
-            Experienced: [{ s: "16:15", e: "18:15", c: 4 }, { s: "17:30", e: "19:30", c: 4 }],
-            New: [{ s: "16:15", e: "18:30", c: 4 }, { s: "17:30", e: "19:30", c: 4 }]
-        }
-    },
     "Ob_Gyn": {
         venue: "Ob/Gyn",
         leadership_times: { start: "16:15", end: "20:15" },
@@ -51,15 +32,18 @@ const clinicConfigs = {
         general: [
             { name: "Ophtho Lead", start: "16:15", end: "18:15", seats: 1 },
             { name: "Ophtho Volunteer", start: "16:15", end: "18:15", seats: 2 },
-            { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 4 },
+            { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 2 },
             { name: "Nursing", start: "16:15", end: "20:15", seats: 2 },
             { name: "Family Planning Lead", start: "16:15", end: "18:15", seats: 2 },
             { name: "Family Planning Volunteer", start: "16:15", end: "18:15", seats: 2 },
             { name: "Family Planning Volunteer", start: "17:15", end: "19:15", seats: 2 },
-            { name: "Family Planning Volunteer", start: "18:15", end: "20:15", seats: 2 }
+            { name: "Family Planning Volunteer", start: "18:15", end: "20:15", seats: 2 },
+            { name: "HOLA Volunteer", start: "16:15", end: "18:15", seats: 1 },
+            { name: "HOLA Volunteer", start: "18:15", end: "20:15", seats: 1 },
+            { name: "GHHS Mentor", start: "16:15", end: "18:15", seats: 2 }
         ],
         shifts: {
-            Experienced: [{ s: "16:15", e: "18:15", c: 3 }, { s: "17:30", e: "19:30", c: 3 }],
+            Experienced: [{ s: "16:15", e: "18:15", c: 3 }, { s: "17:30", e: "19:30", c: 2 }],
             New: [{ s: "16:15", e: "18:15", c: 3 }, { s: "17:30", e: "19:30", c: 3 }]
         }
     },
@@ -73,12 +57,16 @@ const clinicConfigs = {
         general: [
             { name: "Ophtho Lead", start: "16:15", end: "18:15", seats: 1 },
             { name: "Ophtho Volunteer", start: "16:15", end: "18:15", seats: 2 },
-            { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 4 },
+            { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 2 },
             { name: "Nursing", start: "16:15", end: "20:15", seats: 2 },
-            { name: "Audiology", start: "16:15", end: "18:15", seats: 2 }
+            { name: "Audiology", start: "16:15", end: "18:15", seats: 2 },
+            { name: "HOLA Volunteer", start: "16:15", end: "18:15", seats: 1 },
+            { name: "HOLA Volunteer", start: "18:15", end: "20:15", seats: 1 },
+            { name: "Hep C", start: "16:15", end: "20:15", seats: 4 },
+            { name: "GHHS Mentor", start: "16:15", end: "18:15", seats: 2 }
         ],
         shifts: {
-            Experienced: [{ s: "16:15", e: "18:15", c: 4 }, { s: "17:30", e: "19:30", c: 4 }],
+            Experienced: [{ s: "16:15", e: "18:15", c: 4 }, { s: "17:30", e: "19:30", c: 3 }],
             New: [{ s: "16:15", e: "18:30", c: 4 }, { s: "17:30", e: "19:30", c: 4 }]
         }
     },
@@ -90,11 +78,15 @@ const clinicConfigs = {
             { name: "Leadership Volunteer", start: "10:30", end: "12:30", seats: 2 }
         ],
         general: [
-            { name: "MS3/MS4/AI", start: "08:45", end: "11:15", seats: 4 },
-            { name: "Nursing", start: "08:45", end: "13:15", seats: 2 }
+            { name: "MS3/MS4/AI", start: "08:45", end: "11:15", seats: 2 },
+            { name: "Nursing", start: "08:45", end: "13:15", seats: 2 },
+            { name: "HOLA Volunteer", start: "08:45", end: "10:45", seats: 1 },
+            { name: "HOLA Volunteer", start: "10:45", end: "12:45", seats: 1 },
+            { name: "Hep C", start: "08:45", end: "12:45", seats: 4 },
+            { name: "GHHS Mentor", start: "08:45", end: "10:45", seats: 2 }
         ],
         shifts: {
-            Experienced: [{ s: "08:45", e: "11:30", c: 2 }, { s: "10:00", e: "12:30", c: 2 }],
+            Experienced: [{ s: "08:45", e: "11:30", c: 2 }, { s: "10:00", e: "12:30", c: 1 }],
             New: [{ s: "08:45", e: "11:15", c: 3 }, { s: "10:00", e: "12:30", c: 3 }]
         }
     },
@@ -106,11 +98,14 @@ const clinicConfigs = {
             { name: "Leadership Volunteer", start: "17:45", end: "19:45", seats: 2 }
         ],
         general: [
-            { name: "MS3/MS4/AI", start: "16:45", end: "18:15", seats: 4 },
-            { name: "Nursing", start: "16:45", end: "20:15", seats: 2 }
+            { name: "MS3/MS4/AI", start: "16:45", end: "18:15", seats: 2 },
+            { name: "Nursing", start: "16:45", end: "20:15", seats: 2 },
+            { name: "HOLA Volunteer", start: "16:45", end: "18:45", seats: 1 },
+            { name: "HOLA Volunteer", start: "18:45", end: "20:45", seats: 1 },
+            { name: "GHHS Mentor", start: "16:45", end: "18:45", seats: 2 }
         ],
         shifts: {
-            Experienced: [{ s: "16:45", e: "19:00", c: 5 }, { s: "17:45", e: "19:45", c: 5 }],
+            Experienced: [{ s: "16:45", e: "19:00", c: 5 }, { s: "17:45", e: "19:45", c: 4 }],
             New: [{ s: "16:45", e: "19:00", c: 5 }, { s: "17:45", e: "19:45", c: 5 }]
         }
     },
@@ -122,11 +117,14 @@ const clinicConfigs = {
             { name: "Leadership Volunteer", start: "17:30", end: "19:30", seats: 2 }
         ],
         general: [
-            { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 4 },
-            { name: "Nursing", start: "16:15", end: "20:15", seats: 2 }
+            { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 2 },
+            { name: "Nursing", start: "16:15", end: "20:15", seats: 2 },
+            { name: "HOLA Volunteer", start: "16:15", end: "18:15", seats: 1 },
+            { name: "HOLA Volunteer", start: "18:15", end: "20:15", seats: 1 },
+            { name: "GHHS Mentor", start: "16:15", end: "18:15", seats: 2 }
         ],
         shifts: {
-            Experienced: [{ s: "16:15", e: "18:15", c: 3 }, { s: "17:00", e: "19:00", c: 4 }, { s: "17:30", e: "19:30", c: 2 }],
+            Experienced: [{ s: "16:15", e: "18:15", c: 3 }, { s: "17:00", e: "19:00", c: 3 }, { s: "17:30", e: "19:30", c: 2 }],
             New: [{ s: "16:15", e: "18:15", c: 4 }, { s: "17:30", e: "19:30", c: 4 }]
         }
     },
@@ -138,11 +136,14 @@ const clinicConfigs = {
             { name: "Leadership Volunteer", start: "17:30", end: "19:30", seats: 2 }
         ],
         general: [
-            { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 4 },
-            { name: "Nursing", start: "16:15", end: "20:15", seats: 2 }
+            { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 2 },
+            { name: "Nursing", start: "16:15", end: "20:15", seats: 2 },
+            { name: "HOLA Volunteer", start: "16:15", end: "18:15", seats: 1 },
+            { name: "HOLA Volunteer", start: "18:15", end: "20:15", seats: 1 },
+            { name: "GHHS Mentor", start: "16:15", end: "18:15", seats: 2 }
         ],
         shifts: {
-            Experienced: [{ s: "16:15", e: "18:15", c: 4 }, { s: "17:30", e: "19:30", c: 4 }],
+            Experienced: [{ s: "16:15", e: "18:15", c: 4 }, { s: "17:30", e: "19:30", c: 3 }],
             New: [{ s: "16:15", e: "18:15", c: 4 }, { s: "17:30", e: "19:30", c: 4 }]
         }
     },
@@ -154,11 +155,14 @@ const clinicConfigs = {
             { name: "Leadership Volunteer", start: "17:30", end: "19:30", seats: 3 }
         ],
         general: [
-            { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 4 },
-            { name: "Nursing", start: "16:15", end: "20:15", seats: 2 }
+            { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 2 },
+            { name: "Nursing", start: "16:15", end: "20:15", seats: 2 },
+            { name: "HOLA Volunteer", start: "16:15", end: "18:15", seats: 1 },
+            { name: "HOLA Volunteer", start: "18:15", end: "20:15", seats: 1 },
+            { name: "GHHS Mentor", start: "16:15", end: "18:15", seats: 2 }
         ],
         shifts: {
-            Experienced: [{ s: "16:15", e: "18:15", c: 4 }, { s: "17:30", e: "19:30", c: 4 }],
+            Experienced: [{ s: "16:15", e: "18:15", c: 4 }, { s: "17:30", e: "19:30", c: 3 }],
             New: [{ s: "16:15", e: "18:15", c: 5 }, { s: "17:30", e: "19:30", c: 5 }]
         }
     },
@@ -170,11 +174,14 @@ const clinicConfigs = {
             { name: "Leadership Volunteer", start: "9:00", end: "12:30", seats: 3 }
         ],
         general: [
-            { name: "MS3/MS4/AI", start: "08:15", end: "11:15", seats: 4 },
-            { name: "Nursing", start: "08:15", end: "12:15", seats: 2 }
+            { name: "MS3/MS4/AI", start: "08:15", end: "11:15", seats: 2 },
+            { name: "Nursing", start: "08:15", end: "12:15", seats: 2 },
+            { name: "HOLA Volunteer", start: "08:15", end: "10:15", seats: 1 },
+            { name: "HOLA Volunteer", start: "10:15", end: "12:15", seats: 1 },
+            { name: "GHHS Mentor", start: "08:15", end: "10:15", seats: 2 }
         ],
         shifts: {
-            Experienced: [{ s: "08:15", e: "11:15", c: 3 }, { s: "9:00", e: "12:30", c: 3 }],
+            Experienced: [{ s: "08:15", e: "11:15", c: 3 }, { s: "9:00", e: "12:30", c: 2 }],
             New: [{ s: "08:15", e: "11:15", c: 3 }, { s: "9:00", e: "12:30", c: 3 }]
         }
     }
