@@ -1,0 +1,89 @@
+name: GHHS Mentee Assignment
+
+# Runs:
+#   - 28th of each month at 11:30 PM Central (for initial assignments)
+#   - MWF evenings at 11:30 PM Central (to catch late changes)
+#
+# Central Time is UTC-5 (CDT, Mar-Nov) or UTC-6 (CST, Nov-Mar).
+# 11:30 PM CDT = 04:30 UTC next day
+# 11:30 PM CST = 05:30 UTC next day
+# Using 04:30 UTC (11:30 PM during daylight saving, 10:30 PM during standard).
+#
+# 28th at 11:30 PM Central = 29th 04:30 UTC
+# Mon 11:30 PM Central = Tue 04:30 UTC (day 2)
+# Wed 11:30 PM Central = Thu 04:30 UTC (day 4)
+# Fri 11:30 PM Central = Sat 04:30 UTC (day 6)
+
+on:
+  schedule:
+    # 28th of each month
+    - cron: '30 4 29 * *'
+    # MWF evenings (Tue/Thu/Sat UTC = MWF night Central)
+    - cron: '30 4 * * 2,4,6'
+
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Preview only - do not create sessions or enroll users'
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  ghhs-mentee:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install
+
+      # Download mentor-mentee CSV from private gist.
+      # Setup instructions:
+      # 1. Go to https://gist.github.com and create a new SECRET gist
+      # 2. Name the file "ghhs_mentors.csv" with columns: mentor_email,mentee_email
+      # 3. Save and copy the Gist ID from the URL (the long hex string)
+      # 4. Add repository secret GHHS_GIST_ID with the gist ID
+      # 5. GHHS_GIST_TOKEN can reuse HISTORICAL_GIST_TOKEN if it has gist scope
+      - name: Download mentor-mentee CSV
+        env:
+          GIST_ID: ${{ secrets.GHHS_GIST_ID }}
+          GIST_TOKEN: ${{ secrets.GHHS_GIST_TOKEN }}
+        run: |
+          if [ -z "$GIST_ID" ] || [ -z "$GIST_TOKEN" ]; then
+            echo "Gist secrets not configured - cannot proceed"
+            exit 1
+          fi
+          curl -sL \
+            -H "Authorization: token $GIST_TOKEN" \
+            -H "Accept: application/vnd.github.v3.raw" \
+            "https://api.github.com/gists/$GIST_ID" \
+            | jq -r '.files["ghhs_mentors.csv"].content' \
+            > ghhs_mentors.csv
+          echo "Downloaded mentor-mentee CSV ($(wc -l < ghhs_mentors.csv) lines)"
+
+      - name: Run GHHS mentee assignment
+        env:
+          SCHED_API_KEY: ${{ secrets.SCHED_API_KEY }}
+          SCHED_SUBDOMAIN: stvincentsclinic2025
+          GHHS_CSV_PATH: ghhs_mentors.csv
+
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+
+        run: node scripts/ghhs-mentee.js
