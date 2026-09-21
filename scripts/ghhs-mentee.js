@@ -316,7 +316,82 @@ function emailConfigured() {
     );
 }
 
-async function sendSummaryEmail(results) {
+function createTransporter() {
+    return nodemailer.createTransport({
+        host: CONFIG.smtp.host,
+        port: CONFIG.smtp.port,
+        secure: CONFIG.smtp.port === 465,
+        auth: {
+            user: CONFIG.smtp.user,
+            pass: CONFIG.smtp.pass
+        }
+    });
+}
+
+async function sendAssignmentEmail(transporter, mentorEmail, menteeEmail, sessionName, sessionDate) {
+    const subject = `GHHS Mentee Assignment - ${sessionDate}`;
+
+    const text = `Hello,
+
+This is a notification that ${menteeEmail} has been assigned to a GHHS Mentee session.
+
+Session: ${sessionName}
+Date: ${sessionDate}
+Mentor: ${mentorEmail}
+Mentee: ${menteeEmail}
+
+This assignment was made automatically based on the mentor's GHHS Mentor session signup.
+
+If you have any questions, please contact the STV scheduling team.`;
+
+    const recipients = [mentorEmail, menteeEmail];
+
+    try {
+        await transporter.sendMail({
+            from: CONFIG.emailFrom,
+            to: recipients.join(', '),
+            subject,
+            text
+        });
+        console.log(`    Assignment email sent to ${recipients.join(', ')}`);
+    } catch (error) {
+        console.error(`    Failed to send assignment email: ${error.message}`);
+    }
+}
+
+async function sendConflictEmail(transporter, mentorEmail, menteeEmail, sessionDate, conflictReason) {
+    const subject = `GHHS Mentee Assignment Conflict - ${sessionDate}`;
+
+    const text = `Hello,
+
+This is a notification of a scheduling conflict for GHHS Mentee assignment.
+
+Date: ${sessionDate}
+Mentor: ${mentorEmail}
+Mentee: ${menteeEmail}
+
+Conflict: ${conflictReason}
+
+The mentee was NOT enrolled in the GHHS Mentee session because they already have another session scheduled on this date.
+
+If you believe this is an error or need to resolve this conflict, please contact the STV scheduling team.`;
+
+    const recipients = [mentorEmail, menteeEmail, CONFIG.adminEmail];
+
+    try {
+        await transporter.sendMail({
+            from: CONFIG.emailFrom,
+            to: recipients.join(', '),
+            subject,
+            text
+        });
+        console.log(`    Conflict email sent to ${recipients.join(', ')}`);
+    } catch (error) {
+        console.error(`    Failed to send conflict email: ${error.message}`);
+    }
+}
+
+async function sendSummaryEmail(transporter, results) {
     const { enrolled, skipped, errors } = results;
 
     const subject = `GHHS Mentee Assignment Summary - ${new Date().toLocaleDateString()}`;
@@ -357,21 +432,6 @@ async function sendSummaryEmail(results) {
 
     console.log('\n' + text);
 
-    if (!emailConfigured()) {
-        console.log('Email not configured - skipping email send');
-        return;
-    }
-
-    const transporter = nodemailer.createTransport({
-        host: CONFIG.smtp.host,
-        port: CONFIG.smtp.port,
-        secure: CONFIG.smtp.port === 465,
-        auth: {
-            user: CONFIG.smtp.user,
-            pass: CONFIG.smtp.pass
-        }
-    });
-
     try {
         await transporter.sendMail({
             from: CONFIG.emailFrom,
@@ -381,7 +441,7 @@ async function sendSummaryEmail(results) {
         });
         console.log(`Summary email sent to ${CONFIG.adminEmail}`);
     } catch (error) {
-        console.error(`Failed to send email: ${error.message}`);
+        console.error(`Failed to send summary email: ${error.message}`);
     }
 }
 
@@ -428,6 +488,15 @@ async function main() {
     console.log('');
 
     const results = { enrolled: [], skipped: [], errors: [] };
+
+    // Set up email transporter if configured
+    let transporter = null;
+    if (emailConfigured()) {
+        transporter = createTransporter();
+        console.log('Email configured - will send notifications.');
+    } else {
+        console.log('Email not configured - skipping email notifications.');
+    }
 
     // Step 1: Load mentor-mentee mappings
     console.log(`Loading mentor-mentee mappings from ${CONFIG.csvPath}...`);
@@ -516,12 +585,19 @@ async function main() {
                 // Check for conflicts
                 const menteeDates = conflictMap.get(menteeEmail) || new Set();
                 if (menteeDates.has(sessionDate)) {
-                    console.log(`      ${menteeEmail} - CONFLICT: already registered on ${sessionDate}`);
+                    const conflictReason = `Already registered on ${sessionDate}`;
+                    console.log(`      ${menteeEmail} - CONFLICT: ${conflictReason}`);
                     results.skipped.push({
                         menteeEmail,
                         mentorEmail,
-                        conflict: `Already registered on ${sessionDate}`
+                        sessionDate,
+                        conflict: conflictReason
                     });
+
+                    // Send conflict email to mentor, mentee, and admin
+                    if (transporter && !CONFIG.dryRun) {
+                        await sendConflictEmail(transporter, mentorEmail, menteeEmail, sessionDate, conflictReason);
+                    }
                     continue;
                 }
 
@@ -584,8 +660,14 @@ async function main() {
                 results.enrolled.push({
                     menteeEmail,
                     mentorEmail,
-                    sessionName: menteeSessionName
+                    sessionName: menteeSessionName,
+                    sessionDate
                 });
+
+                // Send assignment email to mentor and mentee
+                if (transporter && !CONFIG.dryRun) {
+                    await sendAssignmentEmail(transporter, mentorEmail, menteeEmail, menteeSessionName, sessionDate);
+                }
 
                 // Update conflict map to prevent duplicate enrollments in same run
                 if (!conflictMap.has(menteeEmail)) {
@@ -596,11 +678,15 @@ async function main() {
         }
     }
 
-    // Step 5: Send summary email
+    // Step 5: Send summary email (admin only)
     console.log('\n==================================================');
     console.log('SENDING SUMMARY');
     console.log('==================================================');
-    await sendSummaryEmail(results);
+    if (transporter) {
+        await sendSummaryEmail(transporter, results);
+    } else {
+        console.log('Email not configured - summary printed above only.');
+    }
 
     console.log('\nDone.');
 }

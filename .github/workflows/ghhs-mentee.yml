@@ -2,7 +2,7 @@ name: GHHS Mentee Assignment
 
 # Runs:
 #   - 28th of each month at 11:30 PM Central (for initial assignments)
-#   - MWF evenings at 11:30 PM Central (to catch late changes)
+#   - Tue/Thu/Sat evenings at 11:30 PM Central (to catch late changes)
 #
 # Central Time is UTC-5 (CDT, Mar-Nov) or UTC-6 (CST, Nov-Mar).
 # 11:30 PM CDT = 04:30 UTC next day
@@ -10,16 +10,16 @@ name: GHHS Mentee Assignment
 # Using 04:30 UTC (11:30 PM during daylight saving, 10:30 PM during standard).
 #
 # 28th at 11:30 PM Central = 29th 04:30 UTC
-# Mon 11:30 PM Central = Tue 04:30 UTC (day 2)
-# Wed 11:30 PM Central = Thu 04:30 UTC (day 4)
-# Fri 11:30 PM Central = Sat 04:30 UTC (day 6)
+# Tue 11:30 PM Central = Wed 04:30 UTC (day 3)
+# Thu 11:30 PM Central = Fri 04:30 UTC (day 5)
+# Sat 11:30 PM Central = Sun 04:30 UTC (day 0)
 
 on:
   schedule:
     # 28th of each month
     - cron: '30 4 29 * *'
-    # MWF evenings (Tue/Thu/Sat UTC = MWF night Central)
-    - cron: '30 4 * * 2,4,6'
+    # Tue/Thu/Sat evenings (Wed/Fri/Sun UTC = Tue/Thu/Sat night Central)
+    - cron: '30 4 * * 0,3,5'
 
   workflow_dispatch:
     inputs:
@@ -49,16 +49,12 @@ jobs:
         run: npm install
 
       # Download mentor-mentee CSV from private gist.
-      # Setup instructions:
-      # 1. Go to https://gist.github.com and create a new SECRET gist
-      # 2. Name the file "ghhs_mentors.csv" with columns: mentor_email,mentee_email
-      # 3. Save and copy the Gist ID from the URL (the long hex string)
-      # 4. Add repository secret GHHS_GIST_ID with the gist ID
-      # 5. GHHS_GIST_TOKEN can reuse HISTORICAL_GIST_TOKEN if it has gist scope
+      # Setup: Add repository secret GHHS_GIST_ID with the gist ID from your gist URL.
+      # Uses HISTORICAL_GIST_TOKEN (must have gist scope).
       - name: Download mentor-mentee CSV
         env:
           GIST_ID: ${{ secrets.GHHS_GIST_ID }}
-          GIST_TOKEN: ${{ secrets.GHHS_GIST_TOKEN }}
+          GIST_TOKEN: ${{ secrets.HISTORICAL_GIST_TOKEN }}
         run: |
           if [ -z "$GIST_ID" ] || [ -z "$GIST_TOKEN" ]; then
             echo "Gist secrets not configured - cannot proceed"

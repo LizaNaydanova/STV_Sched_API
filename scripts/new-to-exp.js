@@ -6,7 +6,7 @@
  * sends email notifications.
  *
  * A user qualifies when they hold a "new" ticket and have checked into at least
- * CHECKIN_THRESHOLD shifts with "New" in the session name.
+ * CHECKIN_THRESHOLD shifts with "New" or "GHHS Mentee" in the session name.
  *
  * Data sources:
  *   - Live Sched API (going/all, session/seats)
@@ -147,8 +147,11 @@ const getSessionKey = (s) => getField(s, 'session_key', 'event_key', 'key', 'ses
 /** Extracts session name from a session object. */
 const getSessionName = (s) => getField(s, 'name', 'event_name', 'title');
 
-/** Checks if a session name indicates a "New" volunteer shift. */
-const isNewShift = (name) => (name || '').toLowerCase().includes('new');
+/** Checks if a session name counts toward new-to-exp transition (New shifts or GHHS Mentee shifts). */
+const isNewShift = (name) => {
+    const lower = (name || '').toLowerCase();
+    return lower.includes('new') || lower.includes('ghhs mentee');
+};
 
 // =============================================================================
 // CSV Parsing
@@ -317,7 +320,7 @@ async function sendTicketUpgradeEmail(user) {
 
     const text = `Hello ${userName},
 
-Congratulations! Our records show that you have completed three "new" volunteer shifts, and you have now been transitioned from a new to an experienced volunteer.
+Congratulations! Our records show that you have completed three qualifying volunteer shifts, and you have now been transitioned from a new to an experienced volunteer.
 
 Before you sign up for experienced shifts, please complete the STV Experienced Volunteer Skills Check Form:
 
@@ -332,7 +335,7 @@ St. Vincent's Leadership`;
 
     const html = `<p>Hello ${userName},</p>
 
-<p>Congratulations! Our records show that you have completed three "new" volunteer shifts, and you have now been transitioned from a new to an experienced volunteer.</p>
+<p>Congratulations! Our records show that you have completed three qualifying volunteer shifts, and you have now been transitioned from a new to an experienced volunteer.</p>
 
 <p>Before you sign up for experienced shifts, please complete the STV Experienced Volunteer Skills Check Form:</p>
 
@@ -786,12 +789,12 @@ async function main() {
     const usersWithCounts = calculateCheckinCounts(newUsers, liveCheckins, historicalCheckins);
     const qualifying = usersWithCounts.filter((u) => u.checkedInShifts >= CONFIG.checkinThreshold);
 
-    console.log('\nChecked-in "New" shift counts for all "new" ticket holders (live + historical, deduped):');
+    console.log('\nChecked-in qualifying shift counts for all "new" ticket holders (live + historical, deduped):');
     for (const user of usersWithCounts) {
         console.log(formatUserResult(user, true));
     }
 
-    console.log(`\n=== Users with a "new" ticket checked in to ${CONFIG.checkinThreshold}+ "New" shifts ===`);
+    console.log(`\n=== Users with a "new" ticket checked in to ${CONFIG.checkinThreshold}+ qualifying shifts (New or GHHS Mentee) ===`);
     if (qualifying.length === 0) {
         console.log('None.');
     } else {
