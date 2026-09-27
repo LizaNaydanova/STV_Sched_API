@@ -640,34 +640,64 @@ async function main() {
                         existingSessionKeys.add(menteeSessionKey);
                     }
                 }
-                    // Enroll mentee
-                    console.log(`      Enrolling ${menteeEmail} in ${menteeSessionName}`);
-                    
-                    if (!CONFIG.dryRun) {
-                        try {
-                            const enrollResponse = await enrollUserInSession(
-                                menteeUsername,
-                                menteeSessionKey
-                            );
-                    
+                
+                // Enroll mentee
+                        console.log(`      Enrolling ${menteeEmail} in ${menteeSessionName}`);
+                        
+                        if (!CONFIG.dryRun) {
+                            try {
+                                const enrollResponse = await enrollUserInSession(
+                                    menteeUsername,
+                                    menteeSessionKey
+                                );
+                        
+                                console.log(
+                                    `      user/mod response for ${menteeEmail}:`,
+                                    JSON.stringify(enrollResponse)
+                                );
+                        
+                                await sleep(1500);
+                        
+                                // Verify that Sched actually enrolled the mentee
+                                const seatsAfterEnrollment = await fetchSessionSeats(menteeSessionKey);
+                        
+                                console.log(
+                                    `      Seats after enrollment:`,
+                                    JSON.stringify(seatsAfterEnrollment)
+                                );
+                        
+                                const enrollmentConfirmed = seatsAfterEnrollment.some(
+                                    (seat) => normalizeEmail(seat.email) === menteeEmail
+                                );
+                        
+                                if (!enrollmentConfirmed) {
+                                    console.log(
+                                        `      ERROR: Sched returned OK, but ${menteeEmail} is NOT enrolled.`
+                                    );
+                        
+                                    results.errors.push({
+                                        message: `Sched returned OK but did not enroll ${menteeEmail} in ${menteeSessionKey}`
+                                    });
+                        
+                                    continue;
+                                }
+                        
+                                console.log(`      VERIFIED: ${menteeEmail} is enrolled.`);
+                        
+                            } catch (error) {
+                                console.log(`      Error enrolling: ${error.message}`);
+                        
+                                results.errors.push({
+                                    message: `Enroll ${menteeEmail}: ${error.message}`
+                                });
+                        
+                                continue;
+                            }
+                        } else {
                             console.log(
-                                `      user/mod response for ${menteeEmail}:`,
-                                JSON.stringify(enrollResponse)
+                                `      [DRY RUN] Would enroll ${menteeUsername} in ${menteeSessionKey}`
                             );
-                    
-                            await sleep(CONFIG.throttleMs);
-                        } catch (error) {
-                            console.log(`      Error enrolling: ${error.message}`);
-                            results.errors.push({
-                                message: `Enroll ${menteeEmail}: ${error.message}`
-                            });
-                            continue;
                         }
-                    } else {
-                        console.log(
-                            `      [DRY RUN] Would enroll ${menteeUsername} in ${menteeSessionKey}`
-                        );
-                    }
             }
         }
     }
