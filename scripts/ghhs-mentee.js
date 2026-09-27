@@ -640,40 +640,34 @@ async function main() {
                         existingSessionKeys.add(menteeSessionKey);
                     }
                 }
-
-                // Enroll mentee
-                console.log(`      Enrolling ${menteeEmail} in ${menteeSessionName}`);
-
-                if (!CONFIG.dryRun) {
-                    try {
-                        await enrollUserInSession(menteeUsername, menteeSessionKey);
-                        await sleep(CONFIG.throttleMs);
-                    } catch (error) {
-                        console.log(`      Error enrolling: ${error.message}`);
-                        results.errors.push({ message: `Enroll ${menteeEmail}: ${error.message}` });
-                        continue;
+                    // Enroll mentee
+                    console.log(`      Enrolling ${menteeEmail} in ${menteeSessionName}`);
+                    
+                    if (!CONFIG.dryRun) {
+                        try {
+                            const enrollResponse = await enrollUserInSession(
+                                menteeUsername,
+                                menteeSessionKey
+                            );
+                    
+                            console.log(
+                                `      user/mod response for ${menteeEmail}:`,
+                                JSON.stringify(enrollResponse)
+                            );
+                    
+                            await sleep(CONFIG.throttleMs);
+                        } catch (error) {
+                            console.log(`      Error enrolling: ${error.message}`);
+                            results.errors.push({
+                                message: `Enroll ${menteeEmail}: ${error.message}`
+                            });
+                            continue;
+                        }
+                    } else {
+                        console.log(
+                            `      [DRY RUN] Would enroll ${menteeUsername} in ${menteeSessionKey}`
+                        );
                     }
-                } else {
-                    console.log(`      [DRY RUN] Would enroll ${menteeUsername} in ${menteeSessionKey}`);
-                }
-
-                results.enrolled.push({
-                    menteeEmail,
-                    mentorEmail,
-                    sessionName: menteeSessionName,
-                    sessionDate
-                });
-
-                // Send assignment email to mentor and mentee
-                if (transporter && !CONFIG.dryRun) {
-                    await sendAssignmentEmail(transporter, mentorEmail, menteeEmail, menteeSessionName, sessionDate);
-                }
-
-                // Update conflict map to prevent duplicate enrollments in same run
-                if (!conflictMap.has(menteeEmail)) {
-                    conflictMap.set(menteeEmail, new Set());
-                }
-                conflictMap.get(menteeEmail).add(sessionDate);
             }
         }
     }
