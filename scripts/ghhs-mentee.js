@@ -298,7 +298,8 @@ async function createSession(params) {
 
 async function enrollUserInSession(username, sessionKey) {
     return schedApiCall('user/mod', {
-        username,
+        username: username,
+        role: 'attendee',
         sessions: sessionKey
     });
 }
