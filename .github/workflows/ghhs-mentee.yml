@@ -1,15 +1,19 @@
 name: GHHS Mentee Assignment
 
 # Runs:
-#   - 28th of each month at 11:30 PM Central (for initial assignments)
-#   - Tue/Thu/Sat evenings at 11:30 PM Central (to catch late changes)
+#   - 28th of each month at 11:30 PM Central: creates next month's mentee
+#     sessions and enrolls mentees
+#   - Tue/Thu/Sat evenings at 11:30 PM Central: adds/removes mentees to match
+#     mentor signup changes
+# Every run is a full sync, so overlapping runs are harmless. The script works
+# out which months to check from the Central-time date.
 #
 # Central Time is UTC-5 (CDT, Mar-Nov) or UTC-6 (CST, Nov-Mar).
-# 11:30 PM CDT = 04:30 UTC next day
-# 11:30 PM CST = 05:30 UTC next day
 # Using 04:30 UTC (11:30 PM during daylight saving, 10:30 PM during standard).
 #
 # 28th at 11:30 PM Central = 29th 04:30 UTC
+#   (Feb 28 in non-leap years = Mar 1 04:30 UTC, hence the extra Mar 1 entry;
+#    in leap years that run lands on Feb 29 Central and is a normal re-check)
 # Tue 11:30 PM Central = Wed 04:30 UTC (day 3)
 # Thu 11:30 PM Central = Fri 04:30 UTC (day 5)
 # Sat 11:30 PM Central = Sun 04:30 UTC (day 0)
@@ -18,16 +22,22 @@ on:
   schedule:
     # 28th of each month
     - cron: '30 4 29 * *'
+    - cron: '30 4 1 3 *'
     # Tue/Thu/Sat evenings (Wed/Fri/Sun UTC = Tue/Thu/Sat night Central)
     - cron: '30 4 * * 0,3,5'
 
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Preview only - do not create sessions or enroll users'
+        description: 'Preview only - do not create sessions or change enrollments'
         required: true
         type: boolean
         default: true
+      run_date:
+        description: 'Optional YYYY-MM-DD to run as if it were that date (blank = today)'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -68,13 +78,14 @@ jobs:
             > ghhs_mentors.csv
           echo "Downloaded mentor-mentee CSV ($(wc -l < ghhs_mentors.csv) lines)"
 
-      - name: Run GHHS mentee assignment
+      - name: Sync GHHS mentees
         env:
           SCHED_API_KEY: ${{ secrets.SCHED_API_KEY }}
           SCHED_SUBDOMAIN: stvincentsclinic2025
           GHHS_CSV_PATH: ghhs_mentors.csv
 
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+          RUN_DATE: ${{ github.event_name == 'workflow_dispatch' && inputs.run_date || '' }}
 
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
