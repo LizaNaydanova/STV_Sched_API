@@ -46,6 +46,7 @@ const fetch = require('node-fetch');
 const fs = require('fs');
 const nodePath = require('path');
 const nodemailer = require('nodemailer');
+const { google } = require('googleapis');
 
 // =============================================================================
 // Configuration
@@ -67,7 +68,13 @@ const CONFIG = {
         user: process.env.SMTP_USER || '',
         pass: process.env.SMTP_PASS || ''
     },
-    emailFrom: process.env.EMAIL_FROM || ''
+    emailFrom: process.env.EMAIL_FROM || '',
+    sheetId: process.env.GOOGLE_SHEET_ID || '',
+    sheetRange: process.env.GOOGLE_SHEET_RANGE || 'Form Responses 1!A:K',
+    reminderGistId: process.env.REMINDER_GIST_ID || '',
+    reminderGistToken: process.env.REMINDER_GIST_TOKEN || '',
+    reminderCooldownDays: 14,
+    maxReminders: 3
 };
 
 const BASE_URL = `https://${CONFIG.subdomain}.sched.com/api`;
@@ -314,39 +321,9 @@ function emailConfigured() {
  */
 async function sendTicketUpgradeEmail(user) {
     const userName = user.name || user.username;
-    const subject = "You're Now an Experienced STV Volunteer — Action Required";
-
-    const skillsFormUrl = 'https://forms.cloud.microsoft.com/r/8VfvWqGnmd';
-
-    const text = `Hello ${userName},
-
-Congratulations! Our records show that you have completed three qualifying volunteer shifts, and you have now been transitioned from a new to an experienced volunteer.
-
-Before you sign up for experienced shifts, please complete the STV Experienced Volunteer Skills Check Form:
-
-${skillsFormUrl}
-
-Completing the skills check form ensures your records are up to date and that you're ready for your experienced role.
-
-Thank you for your continued dedication to serving our community. If you have any questions or concerns, please reach out to stvsc@utmb.edu.
-
-Best regards,
-St. Vincent's Leadership`;
-
-    const html = `<p>Hello ${userName},</p>
-
-<p>Congratulations! Our records show that you have completed three qualifying volunteer shifts, and you have now been transitioned from a new to an experienced volunteer.</p>
-
-<p>Before you sign up for experienced shifts, please complete the STV Experienced Volunteer Skills Check Form:</p>
-
-<p><a href="${skillsFormUrl}">${skillsFormUrl}</a></p>
-
-<p>Completing the skills check form ensures your records are up to date and that you're ready for your experienced role.</p>
-
-<p>Thank you for your continued dedication to serving our community. If you have any questions or concerns, please reach out to <a href="mailto:stvsc@utmb.edu">stvsc@utmb.edu</a>.</p>
-
-<p>Best regards,<br>
-St. Vincent's Leadership</p>`;
+    const subject = "You're Now an Experienced STV Volunteer";
+    const text = `Hello ${userName},\n\nCongratulations! You have completed three qualifying volunteer shifts and submitted the STV Experienced Volunteer Skills Check Form. Your experienced volunteer ticket has been issued. You may now register for eligible experienced shifts.\n\nThank you for your service!\nSt. Vincent's Leadership`;
+    const html = undefined;
 
     console.log(`  Sending email notification for ${user.username}...`);
 
@@ -396,6 +373,70 @@ St. Vincent's Leadership</p>`;
     } catch (error) {
         console.error(`    ✗ Email failed: ${error.message}`);
         return false;
+    }
+}
+
+// =============================================================================
+// Form verification and persistent reminders
+// =============================================================================
+async function loadFormEmails() {
+    if (!CONFIG.sheetId || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+        throw new Error('Google Sheet configuration missing; refusing to upgrade anyone');
+    }
+    const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+    const auth = new google.auth.GoogleAuth({credentials, scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']});
+    const sheets = google.sheets({version: 'v4', auth});
+    const result = await sheets.spreadsheets.values.get({spreadsheetId: CONFIG.sheetId, range: CONFIG.sheetRange});
+    const rows = result.data.values || [];
+    if (!rows.length) throw new Error('Form sheet is empty; refusing to upgrade');
+    const headers = rows[0].map(x => String(x).trim().toLowerCase());
+    const emailColumn = headers.indexOf('email');
+    if (emailColumn < 0) throw new Error('No Email column in form sheet');
+    return new Set(rows.slice(1).map(r => normalizeEmail(r[emailColumn])).filter(Boolean));
+}
+
+async function gistRequest(method, body) {
+    if (!CONFIG.reminderGistId || !CONFIG.reminderGistToken) throw new Error('Reminder gist secrets missing');
+    const response = await fetch(`https://api.github.com/gists/${CONFIG.reminderGistId}`, {
+        method,
+        headers: {'Authorization': `Bearer ${CONFIG.reminderGistToken}`, 'Accept': 'application/vnd.github+json', 'User-Agent': 'STV-Volunteer-Upgrade', 'Content-Type': 'application/json'},
+        ...(body ? {body: JSON.stringify(body)} : {})
+    });
+    if (!response.ok) throw new Error(`Reminder gist request failed: ${response.status}`);
+    return response.json();
+}
+async function loadReminderHistory() {
+    const gist = await gistRequest('GET');
+    const file = gist.files?.['reminders.json'];
+    if (!file || file.truncated || typeof file.content !== 'string') throw new Error('Missing or truncated reminders.json gist');
+    return JSON.parse(file.content);
+}
+async function saveReminderHistory(history) {
+    await gistRequest('PATCH', {files: {'reminders.json': {content: JSON.stringify(history, null, 2)}}});
+}
+async function sendMissingFormEmail(user) {
+    if (!emailConfigured()) throw new Error('SMTP not configured');
+    const formUrl = 'https://forms.cloud.microsoft.com/r/8VfvWqGnmd';
+    const transporter = nodemailer.createTransport({host: CONFIG.smtp.host, port: CONFIG.smtp.port, secure: CONFIG.smtp.port === 465, auth: {user: CONFIG.smtp.user, pass: CONFIG.smtp.pass}});
+    await transporter.sendMail({from: CONFIG.emailFrom, to: user.email,
+        subject: 'STV: Complete your skills check to become an experienced volunteer',
+        text: `Hello ${user.name || user.username},\n\nOur records show you have completed the three qualifying shifts required to become an experienced STV volunteer. Before we can issue your experienced ticket, please submit the Experienced Volunteer Skills Check Form:\n${formUrl}\n\nIf you already submitted it, please verify that you used the same email address as your Sched account. Contact stvsc@utmb.edu for assistance.\n\nThank you,\nSt. Vincent's Leadership`});
+}
+async function processMissingForms(users) {
+    if (!users.length) return;
+    const history = await loadReminderHistory();
+    const now = Date.now();
+    for (const user of users) {
+        const email = normalizeEmail(user.email);
+        if (!email) continue;
+        const record = history[email] || {count: 0, lastSent: null};
+        const elapsed = record.lastSent ? (now - Date.parse(record.lastSent)) / 86400000 : Infinity;
+        if (record.count >= CONFIG.maxReminders || elapsed < CONFIG.reminderCooldownDays) continue;
+        if (CONFIG.dryRun) {console.log(`[DRY RUN] Would remind ${email}`); continue;}
+        await sendMissingFormEmail(user);
+        history[email] = {count: record.count + 1, lastSent: new Date().toISOString()};
+        await saveReminderHistory(history); // persist after each successful email
+        console.log(`Missing-form reminder sent to ${email}`);
     }
 }
 
@@ -803,7 +844,15 @@ async function main() {
         }
     }
 
-    await processTicketUpgrades(qualifying);
+    // Fail closed if form data is unavailable; never upgrade without verification.
+    const submittedEmails = await loadFormEmails();
+    const approved = qualifying.filter(u => submittedEmails.has(normalizeEmail(u.email)));
+    const missing = qualifying.filter(u => !submittedEmails.has(normalizeEmail(u.email)));
+    console.log(`Form verified: ${approved.length}; awaiting form: ${missing.length}`);
+    // Read persistent state before making any ticket changes.
+    if (missing.length) await loadReminderHistory();
+    await processTicketUpgrades(approved);
+    await processMissingForms(missing);
 }
 
 main().catch((error) => {
