@@ -61,6 +61,8 @@ const CONFIG = {
     historicalCsv: process.env.HISTORICAL_CSV
         || nodePath.join(__dirname, '..', 'historical_attendance', 'old_shifts.csv'),
     dryRun: process.env.DRY_RUN === 'true',
+    testVolunteerEmail: (process.env.TEST_VOLUNTEER_EMAIL || '').trim().toLowerCase(),
+    testForceThreeShifts: process.env.TEST_FORCE_THREE_SHIFTS === 'true',
     smtp: {
         host: process.env.SMTP_HOST || '',
         port: parseInt(process.env.SMTP_PORT || '587', 10),
@@ -318,6 +320,12 @@ function emailConfigured() {
  */
 async function sendTicketUpgradeEmail(user) {
     const userName = user.name || user.username;
+    if (CONFIG.dryRun && CONFIG.testForceThreeShifts) {
+        console.log(
+            `[TEST MODE] Would send upgrade email for ${user.email}; no email sent.`
+        );
+        return true;
+    }
     const subject = "You're Now an Experienced STV Volunteer";
     const text = `Hello ${userName},\n\nCongratulations! You have completed three qualifying volunteer shifts and submitted the STV Experienced Volunteer Skills Check Form. Your experienced volunteer ticket has been issued. You may now register for eligible experienced shifts.\n\nThank you for your service!\nSt. Vincent's Leadership`;
     const html = undefined;
@@ -821,10 +829,41 @@ async function main() {
     console.log(`\nLoading historical checkins from ${CONFIG.historicalCsv} ...`);
     const historicalCheckins = loadHistoricalCheckins(CONFIG.historicalCsv);
 
-    // Calculate and display results
-    const usersWithCounts = calculateCheckinCounts(newUsers, liveCheckins, historicalCheckins);
-    const qualifying = usersWithCounts.filter((u) => u.checkedInShifts >= CONFIG.checkinThreshold);
+        const usersWithCounts = calculateCheckinCounts(
+        newUsers,
+        liveCheckins,
+        historicalCheckins
+    );
 
+    // Test override: only permitted during dry runs.
+    if (CONFIG.testForceThreeShifts) {
+        if (!CONFIG.dryRun) {
+            throw new Error('Test shift override is forbidden in LIVE mode');
+        }
+
+        const testUser = usersWithCounts.find(
+            u => normalizeEmail(u.email) === CONFIG.testVolunteerEmail
+        );
+
+        if (!testUser) {
+            throw new Error(
+                'Test volunteer not found among users holding a new ticket'
+            );
+        }
+
+        console.log(
+            `[TEST MODE] Simulating 3 qualifying shifts for ${testUser.email}`
+        );
+
+        testUser.checkedInShifts = Math.max(
+            testUser.checkedInShifts,
+            CONFIG.checkinThreshold
+        );
+    }
+
+    const qualifying = usersWithCounts.filter(
+        u => u.checkedInShifts >= CONFIG.checkinThreshold
+    );
     console.log('\nChecked-in qualifying shift counts for all "new" ticket holders (live + historical, deduped):');
     for (const user of usersWithCounts) {
         console.log(formatUserResult(user, true));
