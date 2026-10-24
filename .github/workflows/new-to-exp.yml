@@ -1,33 +1,47 @@
+
 name: New-to-Exp Volunteer Upgrade
+
 on:
   schedule:
     - cron: '17 4 * * 0,3,5'
-    workflow_dispatch:
+
+  workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Practice only — no ticket changes or volunteer emails'
+        description: 'Practice only — no ticket changes'
         required: true
         type: boolean
         default: true
+
       test_volunteer_email:
         description: 'Optional: simulate 3 shifts for this volunteer (dry run only)'
         required: false
         type: string
         default: ''
+
 permissions:
   contents: write
+
 concurrency:
   group: new-to-exp-volunteer-upgrade
   cancel-in-progress: false
+
 jobs:
   new-to-exp:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: npm install
+
+      - name: Install dependencies
+        run: npm install
+
       - name: Download historical attendance CSV
         env:
           GIST_ID: ${{ secrets.HISTORICAL_GIST_ID }}
@@ -37,27 +51,48 @@ jobs:
             echo "Historical CSV not configured"
             exit 0
           fi
+
           mkdir -p historical_attendance
-          curl -fsSL -H "Authorization: Bearer $GIST_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/gists/$GIST_ID" | jq -er '.files["old_shifts.csv"].content' > historical_attendance/old_shifts.csv
+
+          curl -fsSL \
+            -H "Authorization: Bearer $GIST_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/gists/$GIST_ID" \
+            | jq -er '.files["old_shifts.csv"].content' \
+            > historical_attendance/old_shifts.csv
+
+      - name: Validate test settings
+        env:
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true }}
+          TEST_VOLUNTEER_EMAIL: ${{ inputs.test_volunteer_email || '' }}
+        run: |
+          if [ -n "$TEST_VOLUNTEER_EMAIL" ] && [ "$DRY_RUN" != "true" ]; then
+            echo "::error::Test volunteer email can only be used in dry-run mode."
+            exit 1
+          fi
+
       - name: Run new-to-exp upgrade
         env:
           SCHED_API_KEY: ${{ secrets.SCHED_API_KEY }}
           SCHED_SUBDOMAIN: stvincentsclinic2025
-          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true }}
+
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+
           GOOGLE_SHEET_CSV_URL: ${{ vars.GOOGLE_SHEET_CSV_URL }}
-          REMINDER_GIST_ID: ${{ secrets.REMINDER_GIST_ID }}
-          REMINDER_GIST_TOKEN: ${{ secrets.REMINDER_GIST_TOKEN }}
+
           TEST_VOLUNTEER_EMAIL: ${{ inputs.test_volunteer_email || '' }}
-          TEST_FORCE_THREE_SHIFTS: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && inputs.test_volunteer_email != '' }}
+          TEST_FORCE_THREE_SHIFTS: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true && inputs.test_volunteer_email != '' }}
+
         run: node scripts/new-to-exp.js
-        
+
       - name: Save reminder history
-        if: ${{ success() && github.event_name != 'workflow_dispatch' || (success() && inputs.dry_run == false) }}
+        if: ${{ success() && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false)) }}
         run: |
           if git diff --quiet -- reminders.json; then
             echo "No reminder changes to save."
