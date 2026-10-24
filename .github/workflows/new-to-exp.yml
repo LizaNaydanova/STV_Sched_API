@@ -52,6 +52,8 @@ jobs:
           GOOGLE_SHEET_CSV_URL: ${{ vars.GOOGLE_SHEET_CSV_URL }}
           REMINDER_GIST_ID: ${{ secrets.REMINDER_GIST_ID }}
           REMINDER_GIST_TOKEN: ${{ secrets.REMINDER_GIST_TOKEN }}
+          TEST_VOLUNTEER_EMAIL: ${{ inputs.test_volunteer_email || '' }}
+          TEST_FORCE_THREE_SHIFTS: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && inputs.test_volunteer_email != '' }}
         run: node scripts/new-to-exp.js
         
       - name: Save reminder history
