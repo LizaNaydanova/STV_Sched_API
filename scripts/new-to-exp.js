@@ -46,7 +46,6 @@ const fetch = require('node-fetch');
 const fs = require('fs');
 const nodePath = require('path');
 const nodemailer = require('nodemailer');
-const { google } = require('googleapis');
 
 // =============================================================================
 // Configuration
@@ -69,8 +68,7 @@ const CONFIG = {
         pass: process.env.SMTP_PASS || ''
     },
     emailFrom: process.env.EMAIL_FROM || '',
-    sheetId: process.env.GOOGLE_SHEET_ID || '',
-    sheetRange: process.env.GOOGLE_SHEET_RANGE || 'Form Responses 1!A:K',
+    sheetCsvUrl: process.env.GOOGLE_SHEET_CSV_URL || '',
     reminderGistId: process.env.REMINDER_GIST_ID || '',
     reminderGistToken: process.env.REMINDER_GIST_TOKEN || '',
     reminderCooldownDays: 14,
@@ -380,18 +378,24 @@ async function sendTicketUpgradeEmail(user) {
 // Form verification and persistent reminders
 // =============================================================================
 async function loadFormEmails() {
-    if (!CONFIG.sheetId || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-        throw new Error('Google Sheet configuration missing; refusing to upgrade anyone');
+    if (!CONFIG.sheetCsvUrl) throw new Error('GOOGLE_SHEET_CSV_URL missing; refusing upgrades');
+    const url = new URL(CONFIG.sheetCsvUrl);
+    if (url.protocol !== 'https:' || url.hostname !== 'docs.google.com' ||
+        !/^\/spreadsheets\/d\/[^/]+\/export$/.test(url.pathname) ||
+        url.searchParams.get('format') !== 'csv') {
+        throw new Error('Invalid Google Sheets CSV export URL');
     }
-    const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
-    const auth = new google.auth.GoogleAuth({credentials, scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']});
-    const sheets = google.sheets({version: 'v4', auth});
-    const result = await sheets.spreadsheets.values.get({spreadsheetId: CONFIG.sheetId, range: CONFIG.sheetRange});
-    const rows = result.data.values || [];
-    if (!rows.length) throw new Error('Form sheet is empty; refusing to upgrade');
+    const response = await fetch(url.toString(), {redirect: 'follow'});
+    if (!response.ok) throw new Error(`Sheet CSV download failed: ${response.status}`);
+    const csv = await response.text();
+    if (/^\s*<!doctype html|^\s*<html/i.test(csv)) {
+        throw new Error('Google Sheets returned HTML instead of CSV; check sharing permissions');
+    }
+    const rows = parseCsv(csv.replace(/^\uFEFF/, ''));
+    if (rows.length < 2) throw new Error('Sheet has no form responses; refusing upgrades');
     const headers = rows[0].map(x => String(x).trim().toLowerCase());
     const emailColumn = headers.indexOf('email');
-    if (emailColumn < 0) throw new Error('No Email column in form sheet');
+    if (emailColumn < 0) throw new Error('No Email column in form sheet; refusing upgrades');
     return new Set(rows.slice(1).map(r => normalizeEmail(r[emailColumn])).filter(Boolean));
 }
 
