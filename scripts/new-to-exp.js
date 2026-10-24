@@ -69,8 +69,7 @@ const CONFIG = {
     },
     emailFrom: process.env.EMAIL_FROM || '',
     sheetCsvUrl: process.env.GOOGLE_SHEET_CSV_URL || '',
-    reminderGistId: process.env.REMINDER_GIST_ID || '',
-    reminderGistToken: process.env.REMINDER_GIST_TOKEN || '',
+    reminderFile: nodePath.join(__dirname, '..', 'reminders.json'),
     reminderCooldownDays: 14,
     maxReminders: 3
 };
@@ -399,24 +398,16 @@ async function loadFormEmails() {
     return new Set(rows.slice(1).map(r => normalizeEmail(r[emailColumn])).filter(Boolean));
 }
 
-async function gistRequest(method, body) {
-    if (!CONFIG.reminderGistId || !CONFIG.reminderGistToken) throw new Error('Reminder gist secrets missing');
-    const response = await fetch(`https://api.github.com/gists/${CONFIG.reminderGistId}`, {
-        method,
-        headers: {'Authorization': `Bearer ${CONFIG.reminderGistToken}`, 'Accept': 'application/vnd.github+json', 'User-Agent': 'STV-Volunteer-Upgrade', 'Content-Type': 'application/json'},
-        ...(body ? {body: JSON.stringify(body)} : {})
-    });
-    if (!response.ok) throw new Error(`Reminder gist request failed: ${response.status}`);
-    return response.json();
-}
 async function loadReminderHistory() {
-    const gist = await gistRequest('GET');
-    const file = gist.files?.['reminders.json'];
-    if (!file || file.truncated || typeof file.content !== 'string') throw new Error('Missing or truncated reminders.json gist');
-    return JSON.parse(file.content);
+    if (!fs.existsSync(CONFIG.reminderFile)) throw new Error('Missing reminders.json in repository');
+    const history = JSON.parse(fs.readFileSync(CONFIG.reminderFile, 'utf8'));
+    if (!history || typeof history !== 'object' || Array.isArray(history)) throw new Error('Invalid reminder history');
+    return history;
 }
 async function saveReminderHistory(history) {
-    await gistRequest('PATCH', {files: {'reminders.json': {content: JSON.stringify(history, null, 2)}}});
+    const temp = `${CONFIG.reminderFile}.tmp`;
+    fs.writeFileSync(temp, JSON.stringify(history, null, 2) + '\n', {mode: 0o600});
+    fs.renameSync(temp, CONFIG.reminderFile);
 }
 async function sendMissingFormEmail(user) {
     if (!emailConfigured()) throw new Error('SMTP not configured');
@@ -439,7 +430,7 @@ async function processMissingForms(users) {
         if (CONFIG.dryRun) {console.log(`[DRY RUN] Would remind ${email}`); continue;}
         await sendMissingFormEmail(user);
         history[email] = {count: record.count + 1, lastSent: new Date().toISOString()};
-        await saveReminderHistory(history); // persist after each successful email
+        await saveReminderHistory(history); // workflow commits this file after script finishes
         console.log(`Missing-form reminder sent to ${email}`);
     }
 }
