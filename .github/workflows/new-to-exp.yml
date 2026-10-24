@@ -10,7 +10,7 @@ on:
         type: boolean
         default: true
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: new-to-exp-volunteer-upgrade
   cancel-in-progress: false
@@ -48,3 +48,18 @@ jobs:
           REMINDER_GIST_ID: ${{ secrets.REMINDER_GIST_ID }}
           REMINDER_GIST_TOKEN: ${{ secrets.REMINDER_GIST_TOKEN }}
         run: node scripts/new-to-exp.js
+        
+      - name: Save reminder history
+        if: ${{ success() && github.event_name != 'workflow_dispatch' || (success() && inputs.dry_run == false) }}
+        run: |
+          if git diff --quiet -- reminders.json; then
+            echo "No reminder changes to save."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add reminders.json
+          git commit -m "Update volunteer reminder history"
+          git push
