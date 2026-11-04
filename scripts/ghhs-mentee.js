@@ -10,6 +10,7 @@
  *   - Every Tue/Thu/Sat after that (Sept 29, Oct 1, Oct 3, ...): re-check.
  *     New mentor signup  -> their mentee is added.
  *     Mentor dropped     -> their mentee is removed.
+ *     Mentee has another shift that day -> still enrolled; conflict reported.
  *
  * Every run is a full reconciliation, so running it more than once is safe.
  *
@@ -411,7 +412,7 @@ function buildSummary(report) {
     lines.push(`Mentees added:           ${added.length}`);
     lines.push(`Mentees removed:         ${removed.length}`);
     lines.push(`Mentee sessions created: ${created.length}`);
-    lines.push(`Not added (conflict):    ${conflicts.length}`);
+    lines.push(`Same-day conflicts:      ${conflicts.length}`);
     lines.push(`Needs attention:         ${attention.length}`);
     lines.push(`Errors:                  ${errors.length}`);
     lines.push(`Already correct:         ${report.unchanged}`);
@@ -429,8 +430,8 @@ function buildSummary(report) {
         `${r.slot}: ${r.menteeEmail} removed from ${r.sessionName} - ${r.reason}`);
     section('MENTEE SESSIONS CREATED:', created, (c) =>
         `${c.slot}: ${c.sessionName} (${c.sessionKey})`);
-    section('NOT ADDED - MENTEE ALREADY SCHEDULED THAT DAY:', conflicts, (c) =>
-        `${c.slot}: ${c.menteeEmail} (mentor: ${c.mentorEmail}) - already in ${c.conflictsWith.join(', ')}`);
+    section('SAME-DAY CONFLICTS - MENTEE ALSO IN ANOTHER SHIFT THAT DAY (please resolve):', conflicts, (c) =>
+        `${c.slot}: ${c.menteeEmail} (mentor: ${c.mentorEmail}) - also in ${c.conflictsWith.join(', ')}`);
     section('NEEDS ATTENTION:', attention, (msg) => msg);
     section('ERRORS:', errors, (msg) => msg);
 
@@ -446,7 +447,7 @@ async function sendSummaryEmail(transporter, report, text) {
     const prefix = CONFIG.dryRun ? '[DRY RUN] ' : '';
     const subject = `${prefix}GHHS Mentee Report ${report.window.today}: ` +
         `+${report.added.length} added, -${report.removed.length} removed` +
-        (report.errors.length || report.attention.length ? ' (needs review)' : '');
+        (report.errors.length || report.attention.length || report.conflicts.length ? ' (needs review)' : '');
 
     try {
         await transporter.sendMail({
@@ -631,20 +632,21 @@ async function reconcileSlot(slot, ctx) {
 
     // 2. Add mentees whose mentor is signed up
     for (const [username, { menteeEmail, mentorEmail }] of desired) {
-        if (enrolled.has(username)) {
-            report.unchanged++;
-            continue;
-        }
-
-        // Conflict: mentee already has a different session on this date
+        // Conflict: mentee also has a different session on this date. They are
+        // still enrolled as a mentee; the conflict is only reported (every run,
+        // until someone resolves it).
         const slotMenteeKeys = new Set(slot.menteeSessions.map(getSessionKey));
         const sameDayKeys = scheduleMap.get(username)?.get(slot.date) || new Set();
         const conflictsWith = [...sameDayKeys]
             .filter((key) => !slotMenteeKeys.has(key))
             .map((key) => getSessionName(sessionByKey.get(key) || {}) || key);
         if (conflictsWith.length > 0) {
-            console.log(`    CONFLICT: ${menteeEmail} already in ${conflictsWith.join(', ')}`);
+            console.log(`    CONFLICT: ${menteeEmail} also in ${conflictsWith.join(', ')}`);
             report.conflicts.push({ slot: label, menteeEmail, mentorEmail, conflictsWith });
+        }
+
+        if (enrolled.has(username)) {
+            report.unchanged++;
             continue;
         }
 
