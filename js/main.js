@@ -31,7 +31,7 @@ const clinicConfigs = {
         ],
         general: [
             { name: "Ophtho Lead", start: "16:15", end: "18:15", seats: 1 },
-            { name: "Ophtho Volunteer", start: "16:15", end: "18:15", seats: 2 },
+            { name: "Ophtho Volunteer", start: "16:15", end: "18:15", seats: 3 },
             { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 2 },
             { name: "Nursing", start: "16:15", end: "20:15", seats: 2 },
             { name: "Family Planning Lead", start: "16:15", end: "18:15", seats: 2 },
@@ -56,7 +56,7 @@ const clinicConfigs = {
         ],
         general: [
             { name: "Ophtho Lead", start: "16:15", end: "18:15", seats: 1 },
-            { name: "Ophtho Volunteer", start: "16:15", end: "18:15", seats: 2 },
+            { name: "Ophtho Volunteer", start: "16:15", end: "18:15", seats: 3 },
             { name: "MS3/MS4/AI", start: "16:15", end: "18:15", seats: 2 },
             { name: "Nursing", start: "16:15", end: "20:15", seats: 2 },
             { name: "Audiology", start: "16:15", end: "18:15", seats: 2 },
@@ -75,7 +75,7 @@ const clinicConfigs = {
         leadership_times: { start: "08:30", end: "13:15" },
         leadership_volunteer_slots: [
             { name: "Leadership Volunteer", start: "08:45", end: "11:15", seats: 2 },
-            { name: "Leadership Volunteer", start: "10:30", end: "12:30", seats: 2 }
+            { name: "Leadership Volunteer", start: "10:00", end: "12:30", seats: 2 }
         ],
         general: [
             { name: "MS3/MS4/AI", start: "08:45", end: "11:15", seats: 2 },
